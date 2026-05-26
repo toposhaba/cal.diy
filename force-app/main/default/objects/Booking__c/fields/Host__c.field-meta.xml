@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Host__c</fullName>
+    <description>The assigned host user for this booking</description>
+    <externalId>false</externalId>
+    <label>Host</label>
+    <referenceTo>User</referenceTo>
+    <relationshipLabel>Bookings (Host)</relationshipLabel>
+    <relationshipName>Bookings_Host</relationshipName>
+    <required>true</required>
+    <type>Lookup</type>
+</CustomField>

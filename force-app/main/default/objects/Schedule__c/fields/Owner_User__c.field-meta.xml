@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Owner_User__c</fullName>
+    <description>The user who owns this schedule</description>
+    <externalId>false</externalId>
+    <label>Owner User</label>
+    <referenceTo>User</referenceTo>
+    <relationshipLabel>Schedules</relationshipLabel>
+    <relationshipName>Schedules</relationshipName>
+    <required>true</required>
+    <type>Lookup</type>
+</CustomField>

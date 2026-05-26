@@ -1,0 +1,16 @@
+.slds-box_link {
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    border: 1px solid #d8dde6;
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+.slds-box_link:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: #0070d2;
+}
+
+.slds-button_stretch {
+    width: 100%;
+}

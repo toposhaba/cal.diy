@@ -1,0 +1,136 @@
+<template>
+    <lightning-card title="My Schedules" icon-name="standard:shift">
+        <div slot="actions">
+            <lightning-button label="New Schedule" variant="brand" onclick={handleNewScheduleClick}></lightning-button>
+        </div>
+
+        <template lwc:if={isLoading}>
+            <div class="slds-align_absolute-center slds-p-around_large">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template lwc:if={error}>
+            <div class="slds-p-around_medium">
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <h2>{error}</h2>
+                </div>
+            </div>
+        </template>
+
+        <!-- Schedule List -->
+        <div class="slds-p-around_medium">
+            <template lwc:if={hasSchedules}>
+                <template for:each={schedules} for:item="schedule">
+                    <div key={schedule.Id} class="slds-box slds-m-bottom_small">
+                        <div class="slds-grid slds-grid_align-spread">
+                            <div>
+                                <h3 class="slds-text-heading_small">
+                                    {schedule.Name}
+                                    <template lwc:if={schedule.Is_Default__c}>
+                                        <span class="slds-badge slds-theme_success slds-m-left_x-small">Default</span>
+                                    </template>
+                                </h3>
+                                <p class="slds-text-body_small slds-text-color_weak">{schedule.Time_Zone__c}</p>
+                            </div>
+                            <lightning-button label="Add Hours" variant="neutral" data-id={schedule.Id} onclick={handleAddAvailabilityClick}></lightning-button>
+                        </div>
+
+                        <template lwc:if={schedule.Availabilities__r}>
+                            <table class="slds-table slds-table_cell-buffer slds-m-top_small">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Days/Date</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={schedule.Availabilities__r} for:item="avail">
+                                        <tr key={avail.Id}>
+                                            <td>{avail.Record_Type__c}</td>
+                                            <td>
+                                                <template lwc:if={avail.Days__c}>{avail.Days__c}</template>
+                                                <template lwc:if={avail.Override_Date__c}>{avail.Override_Date__c}</template>
+                                            </td>
+                                            <td>{avail.Start_Time__c}</td>
+                                            <td>{avail.End_Time__c}</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                    </div>
+                </template>
+            </template>
+
+            <template lwc:if={!hasSchedules}>
+                <template lwc:if={!isLoading}>
+                    <div class="slds-align_absolute-center slds-p-around_large">
+                        <p class="slds-text-color_weak">No schedules configured. Create one to get started.</p>
+                    </div>
+                </template>
+            </template>
+        </div>
+    </lightning-card>
+
+    <!-- New Schedule Modal -->
+    <template lwc:if={showNewScheduleForm}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleCancelNewSchedule} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">New Schedule</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-input type="text" label="Schedule Name" onchange={handleScheduleNameChange} required></lightning-input>
+                    <lightning-combobox label="Time Zone" options={timezoneOptions} onchange={handleTimeZoneChange} required class="slds-m-top_small"></lightning-combobox>
+                    <lightning-input type="checkbox" label="Set as Default" onchange={handleIsDefaultChange} class="slds-m-top_small"></lightning-input>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCancelNewSchedule}></lightning-button>
+                    <lightning-button label="Create" variant="brand" onclick={handleCreateSchedule}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <!-- Add Availability Modal -->
+    <template lwc:if={showAddAvailabilityForm}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleCancelAddAvailability} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">Add Availability</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-combobox label="Type" options={typeOptions} value={availabilityType} onchange={handleAvailabilityTypeChange}></lightning-combobox>
+
+                    <template lwc:if={isWorkingHoursType}>
+                        <lightning-dual-listbox label="Days" source-label="Available" selected-label="Selected" options={dayOptions} onchange={handleDaysChange} class="slds-m-top_small"></lightning-dual-listbox>
+                    </template>
+
+                    <template lwc:if={isDateOverrideType}>
+                        <lightning-input type="date" label="Date" onchange={handleOverrideDateChange} class="slds-m-top_small"></lightning-input>
+                    </template>
+
+                    <div class="slds-grid slds-gutters_small slds-m-top_small">
+                        <div class="slds-col">
+                            <lightning-input type="time" label="Start Time" onchange={handleAvailStartTimeChange} required></lightning-input>
+                        </div>
+                        <div class="slds-col">
+                            <lightning-input type="time" label="End Time" onchange={handleAvailEndTimeChange} required></lightning-input>
+                        </div>
+                    </div>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCancelAddAvailability}></lightning-button>
+                    <lightning-button label="Save" variant="brand" onclick={handleSaveAvailability}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>
