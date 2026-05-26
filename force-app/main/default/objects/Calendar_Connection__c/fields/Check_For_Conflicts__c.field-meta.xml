@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Check_For_Conflicts__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description>Whether to check this calendar for busy time conflicts when calculating availability</description>
+    <externalId>false</externalId>
+    <label>Check For Conflicts</label>
+    <type>Checkbox</type>
+</CustomField>

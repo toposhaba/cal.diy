@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Calendar_Id__c</fullName>
+    <description>External calendar identifier (e.g. primary for Google, calendar ID for Outlook)</description>
+    <externalId>false</externalId>
+    <label>Calendar ID</label>
+    <length>500</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

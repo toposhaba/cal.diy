@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Enable_Calendar_Sync__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description>Whether to sync bookings with external calendars</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Enable Calendar Sync</label>
+    <type>Checkbox</type>
+</CustomField>

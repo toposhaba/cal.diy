@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>End_Date__c</fullName>
+    <description>End date for the recurring series (alternative to occurrences)</description>
+    <externalId>false</externalId>
+    <label>Series End Date</label>
+    <required>false</required>
+    <type>Date</type>
+</CustomField>

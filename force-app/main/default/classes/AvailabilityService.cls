@@ -79,13 +79,25 @@ public with sharing class AvailabilityService {
             ORDER BY Start_DateTime__c ASC
         ];
 
-        return calculateSlots(eventType, availabilities, existingBookings, startDate, endDate);
+        List<CalendarIntegrationService.BusySlot> externalBusy = new List<CalendarIntegrationService.BusySlot>();
+        try {
+            externalBusy = CalendarIntegrationService.getExternalBusyTimes(
+                eventType.Owner_User__c,
+                Datetime.newInstance(startDate, Time.newInstance(0, 0, 0, 0)),
+                Datetime.newInstance(endDate, Time.newInstance(23, 59, 59, 0))
+            );
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'External calendar check failed: ' + e.getMessage());
+        }
+
+        return calculateSlots(eventType, availabilities, existingBookings, externalBusy, startDate, endDate);
     }
 
     private static List<TimeSlot> calculateSlots(
         Event_Type__c eventType,
         List<Availability__c> availabilities,
         List<Booking__c> existingBookings,
+        List<CalendarIntegrationService.BusySlot> externalBusy,
         Date startDate,
         Date endDate
     ) {
@@ -117,7 +129,8 @@ public with sharing class AvailabilityService {
                     Datetime slotEnd = slotStart.addMinutes(durationMinutes);
 
                     if (slotStart >= minimumStart &&
-                        !hasConflict(slotStart, slotEnd, bufferBefore, bufferAfter, existingBookings)) {
+                        !hasConflict(slotStart, slotEnd, bufferBefore, bufferAfter, existingBookings) &&
+                        !hasExternalConflict(slotStart, slotEnd, externalBusy)) {
                         slots.add(new TimeSlot(slotStart, slotEnd));
                     }
 
@@ -144,6 +157,18 @@ public with sharing class AvailabilityService {
         }
 
         return dateOverrides.isEmpty() ? workingHours : dateOverrides;
+    }
+
+    private static Boolean hasExternalConflict(
+        Datetime slotStart, Datetime slotEnd,
+        List<CalendarIntegrationService.BusySlot> externalBusy
+    ) {
+        for (CalendarIntegrationService.BusySlot busy : externalBusy) {
+            if (slotStart < busy.endTime && slotEnd > busy.startTime) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Boolean hasConflict(
