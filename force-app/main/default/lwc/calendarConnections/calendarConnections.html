@@ -1,0 +1,82 @@
+<template>
+    <lightning-card title="Calendar Connections" icon-name="standard:connected_apps">
+        <div slot="actions">
+            <lightning-button label="Add Calendar" variant="brand" onclick={handleAddClick}></lightning-button>
+        </div>
+
+        <template lwc:if={isLoading}>
+            <div class="slds-align_absolute-center slds-p-around_large">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template lwc:if={error}>
+            <div class="slds-p-around_medium">
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <h2>{error}</h2>
+                </div>
+            </div>
+        </template>
+
+        <div class="slds-p-around_medium">
+            <template lwc:if={hasConnections}>
+                <template for:each={formattedConnections} for:item="conn">
+                    <div key={conn.Id} class="slds-box slds-m-bottom_small">
+                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                            <div>
+                                <h3 class="slds-text-heading_small">{conn.providerLabel}</h3>
+                                <template lwc:if={conn.Calendar_Id__c}>
+                                    <p class="slds-text-body_small slds-text-color_weak">{conn.Calendar_Id__c}</p>
+                                </template>
+                                <div class="slds-m-top_xx-small">
+                                    <span class={conn.statusClass}>{conn.statusLabel}</span>
+                                    <template lwc:if={conn.Check_For_Conflicts__c}>
+                                        <span class="slds-badge slds-m-left_xx-small">Conflict Check</span>
+                                    </template>
+                                    <template lwc:if={conn.Push_Events_To__c}>
+                                        <span class="slds-badge slds-m-left_xx-small">Push Events</span>
+                                    </template>
+                                </div>
+                            </div>
+                            <div>
+                                <lightning-button label={conn.toggleLabel} data-id={conn.Id} onclick={handleToggle} class="slds-m-right_xx-small"></lightning-button>
+                                <lightning-button label="Remove" variant="destructive-text" data-id={conn.Id} onclick={handleDelete}></lightning-button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+
+            <template lwc:if={!hasConnections}>
+                <template lwc:if={!isLoading}>
+                    <div class="slds-align_absolute-center slds-p-around_large">
+                        <p class="slds-text-color_weak">No calendar connections configured. Add one to sync your availability.</p>
+                    </div>
+                </template>
+            </template>
+        </div>
+    </lightning-card>
+
+    <!-- Add Connection Modal -->
+    <template lwc:if={showAddForm}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleCancelAdd} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">Add Calendar Connection</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-combobox label="Provider" options={providerOptions} value={newProvider} onchange={handleProviderChange} required></lightning-combobox>
+                    <lightning-input type="text" label="Calendar ID (optional)" value={newCalendarId} onchange={handleCalendarIdChange} class="slds-m-top_small" placeholder="Leave blank for primary calendar"></lightning-input>
+                    <lightning-input type="checkbox" label="Check for scheduling conflicts" checked={newCheckConflicts} onchange={handleCheckConflictsChange} class="slds-m-top_small"></lightning-input>
+                    <lightning-input type="checkbox" label="Push new bookings to this calendar" checked={newPushEvents} onchange={handlePushEventsChange} class="slds-m-top_small"></lightning-input>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCancelAdd}></lightning-button>
+                    <lightning-button label="Connect" variant="brand" onclick={handleSaveConnection}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>

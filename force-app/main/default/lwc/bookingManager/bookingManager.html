@@ -1,0 +1,90 @@
+<template>
+    <lightning-card title="My Bookings" icon-name="standard:today">
+        <div slot="actions">
+            <lightning-button-icon icon-name="utility:refresh" onclick={loadBookings} alternative-text="Refresh"></lightning-button-icon>
+        </div>
+
+        <div class="slds-p-around_medium">
+            <div class="slds-grid slds-gutters_small slds-m-bottom_medium">
+                <div class="slds-col slds-size_1-of-2">
+                    <lightning-input type="date" label="From" value={startDate} onchange={handleStartDateChange}></lightning-input>
+                </div>
+                <div class="slds-col slds-size_1-of-2">
+                    <lightning-input type="date" label="To" value={endDate} onchange={handleEndDateChange}></lightning-input>
+                </div>
+            </div>
+
+            <template lwc:if={isLoading}>
+                <div class="slds-align_absolute-center slds-p-around_large">
+                    <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                </div>
+            </template>
+
+            <template lwc:if={error}>
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <h2>{error}</h2>
+                </div>
+            </template>
+
+            <template lwc:if={hasBookings}>
+                <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                    <thead>
+                        <tr class="slds-line-height_reset">
+                            <th scope="col"><div class="slds-truncate">Title</div></th>
+                            <th scope="col"><div class="slds-truncate">When</div></th>
+                            <th scope="col"><div class="slds-truncate">Booker</div></th>
+                            <th scope="col"><div class="slds-truncate">Status</div></th>
+                            <th scope="col"><div class="slds-truncate">Actions</div></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={formattedBookings} for:item="booking">
+                            <tr key={booking.Id}>
+                                <td><div class="slds-truncate">{booking.Title__c}</div></td>
+                                <td><div class="slds-truncate">{booking.formattedStart} - {booking.formattedEnd}</div></td>
+                                <td><div class="slds-truncate">{booking.Booker_Name__c} ({booking.Booker_Email__c})</div></td>
+                                <td><span class={booking.statusClass}>{booking.Status__c}</span></td>
+                                <td>
+                                    <template lwc:if={booking.isActive}>
+                                        <template lwc:if={booking.isPending}>
+                                            <lightning-button label="Confirm" variant="success" size="small" data-id={booking.Id} onclick={handleConfirm}></lightning-button>
+                                        </template>
+                                        <lightning-button label="Cancel" variant="destructive" size="small" data-id={booking.Id} onclick={handleCancelClick} class="slds-m-left_xx-small"></lightning-button>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+
+            <template lwc:if={!hasBookings}>
+                <template lwc:if={!isLoading}>
+                    <div class="slds-align_absolute-center slds-p-around_large">
+                        <p class="slds-text-color_weak">No bookings found for this period.</p>
+                    </div>
+                </template>
+            </template>
+        </div>
+    </lightning-card>
+
+    <!-- Cancel Modal -->
+    <template lwc:if={showCancelModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleCancelModalClose} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">Cancel Booking</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-textarea label="Cancellation Reason" value={cancelReason} onchange={handleCancelReasonChange}></lightning-textarea>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Go Back" onclick={handleCancelModalClose}></lightning-button>
+                    <lightning-button label="Cancel Booking" variant="destructive" onclick={handleCancelConfirm}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>

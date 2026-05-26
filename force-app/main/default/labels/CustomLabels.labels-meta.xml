@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>Scheduling_Book_Meeting</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Book a Meeting</shortDescription>
+        <value>Book a Meeting</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Select_Meeting_Type</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Select a Meeting Type</shortDescription>
+        <value>Select a Meeting Type</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Select_Date</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Select Date</shortDescription>
+        <value>Select Date</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Available_Times</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Available Times</shortDescription>
+        <value>Available Times</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_No_Available_Times</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>No Available Times</shortDescription>
+        <value>No available times for this date.</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Confirm_Booking</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Confirm Booking</shortDescription>
+        <value>Confirm Booking</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Booking_Confirmed</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Booking Confirmed</shortDescription>
+        <value>Booking Confirmed!</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Your_Name</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Your Name</shortDescription>
+        <value>Your Name</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Your_Email</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Your Email</shortDescription>
+        <value>Your Email</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Book_Another</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Book Another</shortDescription>
+        <value>Book Another</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_My_Bookings</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>My Bookings</shortDescription>
+        <value>My Bookings</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Cancel_Booking</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Cancel Booking</shortDescription>
+        <value>Cancel Booking</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Cancellation_Reason</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Cancellation Reason</shortDescription>
+        <value>Cancellation Reason</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_My_Schedules</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>My Schedules</shortDescription>
+        <value>My Schedules</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_New_Schedule</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>New Schedule</shortDescription>
+        <value>New Schedule</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Add_Hours</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Add Hours</shortDescription>
+        <value>Add Hours</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Minutes</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>minutes</shortDescription>
+        <value>minutes</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Recurring_Booking</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Recurring Booking</shortDescription>
+        <value>Recurring Booking</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Calendar_Connected</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Calendar Connected</shortDescription>
+        <value>Calendar Connected</value>
+    </labels>
+    <labels>
+        <fullName>Scheduling_Pending_Approval</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Pending Approval</shortDescription>
+        <value>Your booking is pending host approval.</value>
+    </labels>
+</CustomLabels>
