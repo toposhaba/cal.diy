@@ -1,46 +1,34 @@
 ## What does this PR do?
 
-<!-- Please include a summary of the change and which issue is fixed. Please also include relevant motivation and context. List any dependencies that are required for this change.
+<!-- Summary of changes and which issue is addressed -->
 
-Note: Cal.diy is a community-maintained open-source project. Contributions here do NOT flow to Cal.com's production service. -->
+- Fixes #XXXX
 
-- Fixes #XXXX (GitHub issue number)
+## Type of Change
 
-## Visual Demo (For contributors especially)
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Refactoring
+- [ ] Configuration change
 
-A visual demonstration is strongly recommended, for both the original and new change **(video / image - any one)**.
+## Salesforce Deployment Checklist
 
-#### Video Demo (if applicable):
-
-- Show screen recordings of the issue or feature.
-- Demonstrate how to reproduce the issue, the behavior before and after the change.
-
-#### Image Demo (if applicable):
-
-- Add side-by-side screenshots of the original and updated change.
-- Highlight any significant change(s).
-
-## Mandatory Tasks (DO NOT REMOVE)
-
-- [ ] I have self-reviewed the code (A decent size PR without self-review might be rejected).
-- [ ] I have updated the developer docs if this PR makes changes that would require a documentation change. If N/A, write N/A here and check the checkbox.
-- [ ] I confirm automated tests are in place that prove my fix is effective or that my feature works.
+- [ ] All Apex classes use `with sharing`
+- [ ] All SOQL queries use `WITH USER_MODE`
+- [ ] All DML uses `as user` syntax
+- [ ] No hardcoded IDs or credentials
+- [ ] Test coverage is 75%+ for affected classes
+- [ ] Permission sets updated if new fields/objects added
 
 ## How should this be tested?
 
-<!-- Please describe the tests that you ran to verify your changes. Provide instructions so we can reproduce. Please also list any relevant details for your test configuration. Write details that help to start the tests -->
+<!-- Steps to reproduce and verify the change -->
 
-- Are there environment variables that should be set?
-- What are the minimal test data to have?
-- What is expected (happy path) to have (input and output)?
-- Any other important info that could help to test that PR
+1. Deploy: `sf project deploy start --source-dir force-app`
+2. Run tests: `sf apex run test --test-level RunLocalTests`
+3. ...
 
-## Checklist
+## Test Results
 
-<!-- Remove bullet points below that don't apply to you -->
-
-- I haven't read the [contributing guide](https://github.com/calcom/cal.diy/blob/main/CONTRIBUTING.md)
-- My code doesn't follow the style guidelines of this project
-- I haven't commented my code, particularly in hard-to-understand areas
-- I haven't checked if my changes generate no new warnings
-- My PR is too large (>500 lines or >10 files) and should be split into smaller PRs
+- [ ] All existing tests pass
+- [ ] New tests added for new functionality
