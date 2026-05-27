@@ -47,8 +47,8 @@
                 </template>
             </template>
 
-            <template lwc:if={!hasConnections}>
-                <template lwc:if={!isLoading}>
+            <template lwc:if={noConnections}>
+                <template lwc:if={notLoading}>
                     <div class="slds-align_absolute-center slds-p-around_large">
                         <p class="slds-text-color_weak">No calendar connections configured. Add one to sync your availability.</p>
                     </div>

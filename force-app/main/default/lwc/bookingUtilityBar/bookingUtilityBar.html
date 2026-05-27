@@ -1,0 +1,79 @@
+<template>
+    <div class="utility-container">
+        <div class="slds-grid slds-grid_align-spread slds-p-horizontal_small slds-p-vertical_xx-small utility-header">
+            <div class="slds-grid slds-grid_vertical-align-center">
+                <lightning-button-group>
+                    <lightning-button
+                        label="Upcoming"
+                        variant={upcomingVariant}
+                        data-view="upcoming"
+                        onclick={handleViewChange}
+                    ></lightning-button>
+                    <lightning-button
+                        label="Pending"
+                        variant={pendingVariant}
+                        data-view="pending"
+                        onclick={handleViewChange}
+                    ></lightning-button>
+                </lightning-button-group>
+                <template lwc:if={pendingCount}>
+                    <span class="slds-badge slds-badge_inverse slds-m-left_x-small">{pendingCount}</span>
+                </template>
+            </div>
+            <div>
+                <lightning-button-icon icon-name="utility:refresh" alternative-text="Refresh" onclick={handleRefresh} size="small" class="slds-m-right_xx-small"></lightning-button-icon>
+                <lightning-button label="New Booking" variant="brand" size="small" onclick={handleNewBooking}></lightning-button>
+            </div>
+        </div>
+
+        <template lwc:if={isLoading}>
+            <div class="slds-align_absolute-center slds-p-around_medium">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template lwc:if={error}>
+            <div class="slds-p-around_small">
+                <div class="slds-text-color_error slds-text-body_small">{error}</div>
+            </div>
+        </template>
+
+        <template lwc:if={hasDisplayedBookings}>
+            <div class="booking-list">
+                <template for:each={displayedBookings} for:item="booking">
+                    <div key={booking.Id} class="booking-item slds-p-horizontal_small slds-p-vertical_x-small" data-id={booking.Id} onclick={handleOpenBooking}>
+                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                            <div class="slds-truncate">
+                                <p class="slds-text-body_small slds-text-title_bold">{booking.eventName}</p>
+                                <p class="slds-text-body_small slds-text-color_weak">{booking.formattedTime}</p>
+                                <p class="slds-text-body_small slds-text-color_weak">{booking.Booker_Name__c}</p>
+                            </div>
+                            <div class="booking-actions" onclick={stopPropagation}>
+                                <template lwc:if={booking.isPending}>
+                                    <lightning-button-icon icon-name="utility:check" alternative-text="Confirm" data-id={booking.Id} onclick={handleConfirm} size="small" variant="brand"></lightning-button-icon>
+                                </template>
+                                <lightning-button-icon icon-name="utility:close" alternative-text="Cancel" data-id={booking.Id} onclick={handleCancel} size="small" variant="destructive"></lightning-button-icon>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <template lwc:if={hasDisplayedBookings}>
+        </template>
+        <template lwc:else>
+            <template lwc:if={isLoading}>
+            </template>
+            <template lwc:else>
+                <div class="slds-align_absolute-center slds-p-around_medium">
+                    <p class="slds-text-body_small slds-text-color_weak">{emptyMessage}</p>
+                </div>
+            </template>
+        </template>
+
+        <div class="slds-p-around_x-small slds-text-align_center utility-footer">
+            <lightning-button label="View All Bookings" variant="base" onclick={handleViewAll}></lightning-button>
+        </div>
+    </div>
+</template>

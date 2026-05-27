@@ -42,14 +42,42 @@ export default class ScheduleManager extends LightningElement {
 
     get timezoneOptions() {
         return [
-            { label: 'America/New_York (ET)', value: 'America/New_York' },
-            { label: 'America/Chicago (CT)', value: 'America/Chicago' },
-            { label: 'America/Denver (MT)', value: 'America/Denver' },
-            { label: 'America/Los_Angeles (PT)', value: 'America/Los_Angeles' },
-            { label: 'Europe/London (GMT)', value: 'Europe/London' },
-            { label: 'Europe/Paris (CET)', value: 'Europe/Paris' },
-            { label: 'Asia/Tokyo (JST)', value: 'Asia/Tokyo' },
-            { label: 'Australia/Sydney (AEST)', value: 'Australia/Sydney' }
+            { label: 'Pacific/Honolulu (HST, UTC-10)', value: 'Pacific/Honolulu' },
+            { label: 'America/Anchorage (AKST, UTC-9)', value: 'America/Anchorage' },
+            { label: 'America/Los_Angeles (PT, UTC-8)', value: 'America/Los_Angeles' },
+            { label: 'America/Phoenix (MST, UTC-7)', value: 'America/Phoenix' },
+            { label: 'America/Denver (MT, UTC-7)', value: 'America/Denver' },
+            { label: 'America/Chicago (CT, UTC-6)', value: 'America/Chicago' },
+            { label: 'America/New_York (ET, UTC-5)', value: 'America/New_York' },
+            { label: 'America/Halifax (AT, UTC-4)', value: 'America/Halifax' },
+            { label: 'America/St_Johns (NT, UTC-3:30)', value: 'America/St_Johns' },
+            { label: 'America/Sao_Paulo (BRT, UTC-3)', value: 'America/Sao_Paulo' },
+            { label: 'America/Argentina/Buenos_Aires (ART, UTC-3)', value: 'America/Argentina/Buenos_Aires' },
+            { label: 'Atlantic/Cape_Verde (CVT, UTC-1)', value: 'Atlantic/Cape_Verde' },
+            { label: 'Europe/London (GMT, UTC+0)', value: 'Europe/London' },
+            { label: 'Europe/Paris (CET, UTC+1)', value: 'Europe/Paris' },
+            { label: 'Europe/Berlin (CET, UTC+1)', value: 'Europe/Berlin' },
+            { label: 'Europe/Amsterdam (CET, UTC+1)', value: 'Europe/Amsterdam' },
+            { label: 'Africa/Lagos (WAT, UTC+1)', value: 'Africa/Lagos' },
+            { label: 'Europe/Athens (EET, UTC+2)', value: 'Europe/Athens' },
+            { label: 'Africa/Cairo (EET, UTC+2)', value: 'Africa/Cairo' },
+            { label: 'Europe/Helsinki (EET, UTC+2)', value: 'Europe/Helsinki' },
+            { label: 'Europe/Istanbul (TRT, UTC+3)', value: 'Europe/Istanbul' },
+            { label: 'Europe/Moscow (MSK, UTC+3)', value: 'Europe/Moscow' },
+            { label: 'Asia/Dubai (GST, UTC+4)', value: 'Asia/Dubai' },
+            { label: 'Asia/Karachi (PKT, UTC+5)', value: 'Asia/Karachi' },
+            { label: 'Asia/Kolkata (IST, UTC+5:30)', value: 'Asia/Kolkata' },
+            { label: 'Asia/Dhaka (BST, UTC+6)', value: 'Asia/Dhaka' },
+            { label: 'Asia/Bangkok (ICT, UTC+7)', value: 'Asia/Bangkok' },
+            { label: 'Asia/Singapore (SGT, UTC+8)', value: 'Asia/Singapore' },
+            { label: 'Asia/Shanghai (CST, UTC+8)', value: 'Asia/Shanghai' },
+            { label: 'Asia/Hong_Kong (HKT, UTC+8)', value: 'Asia/Hong_Kong' },
+            { label: 'Asia/Tokyo (JST, UTC+9)', value: 'Asia/Tokyo' },
+            { label: 'Asia/Seoul (KST, UTC+9)', value: 'Asia/Seoul' },
+            { label: 'Australia/Adelaide (ACST, UTC+9:30)', value: 'Australia/Adelaide' },
+            { label: 'Australia/Sydney (AEST, UTC+10)', value: 'Australia/Sydney' },
+            { label: 'Australia/Brisbane (AEST, UTC+10)', value: 'Australia/Brisbane' },
+            { label: 'Pacific/Auckland (NZST, UTC+12)', value: 'Pacific/Auckland' }
         ];
     }
 
@@ -65,6 +93,14 @@ export default class ScheduleManager extends LightningElement {
         return this.schedules && this.schedules.length > 0;
     }
 
+    get noSchedules() {
+        return !this.hasSchedules;
+    }
+
+    get notLoading() {
+        return !this.isLoading;
+    }
+
     connectedCallback() {
         this.loadSchedules();
     }
@@ -73,12 +109,32 @@ export default class ScheduleManager extends LightningElement {
         this.isLoading = true;
         this.error = undefined;
         try {
-            this.schedules = await getMySchedules();
+            const raw = await getMySchedules();
+            this.schedules = raw.map(s => ({
+                ...s,
+                Availabilities__r: s.Availabilities__r
+                    ? s.Availabilities__r.map(a => ({
+                          ...a,
+                          formattedStartTime: this.formatTimeMs(a.Start_Time__c),
+                          formattedEndTime: this.formatTimeMs(a.End_Time__c)
+                      }))
+                    : null
+            }));
         } catch (err) {
             this.error = this.extractError(err);
         } finally {
             this.isLoading = false;
         }
+    }
+
+    formatTimeMs(ms) {
+        if (ms == null) return '';
+        const totalMinutes = Math.floor(ms / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHour = hours % 12 || 12;
+        return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
     }
 
     handleNewScheduleClick() {

@@ -4,7 +4,7 @@
     <description>ID of the event created in the external calendar (Google/Outlook)</description>
     <externalId>true</externalId>
     <label>External Event ID</label>
-    <length>500</length>
+    <length>255</length>
     <required>false</required>
     <type>Text</type>
     <unique>false</unique>

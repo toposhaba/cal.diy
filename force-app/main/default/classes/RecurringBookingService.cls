@@ -5,7 +5,7 @@ public with sharing class RecurringBookingService {
     public static List<Booking__c> createRecurringSeries(RecurringBookingRequest request) {
         validateRequest(request);
 
-        Event_Type__c eventType = [
+        List<Event_Type__c> eventTypes = [
             SELECT Id, Name, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
                    Owner_User__c, Location__c, Requires_Confirmation__c, Is_Active__c
             FROM Event_Type__c
@@ -14,9 +14,10 @@ public with sharing class RecurringBookingService {
             LIMIT 1
         ];
 
-        if (eventType == null) {
+        if (eventTypes.isEmpty()) {
             throw new SchedulingException('EVENT_TYPE_NOT_FOUND', 'Event type not found or inactive');
         }
+        Event_Type__c eventType = eventTypes[0];
 
         Recurring_Pattern__c pattern = new Recurring_Pattern__c(
             Frequency__c = request.frequency,

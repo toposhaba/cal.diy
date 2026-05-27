@@ -2,6 +2,8 @@ import { LightningElement, api, track } from 'lwc';
 import getActiveEventTypes from '@salesforce/apex/SchedulingController.getActiveEventTypes';
 import getAvailableSlots from '@salesforce/apex/SchedulingController.getAvailableSlots';
 import createBooking from '@salesforce/apex/SchedulingController.createBooking';
+import createBookingWithFields from '@salesforce/apex/SchedulingController.createBookingWithFields';
+import getBookingFormFields from '@salesforce/apex/SchedulingController.getBookingFormFields';
 
 export default class CalendarBooking extends LightningElement {
     @api hostUserId;
@@ -12,6 +14,8 @@ export default class CalendarBooking extends LightningElement {
     @track selectedSlot;
     @track bookerName = '';
     @track bookerEmail = '';
+    @track formFields = [];
+    @track fieldValues = {};
     @track isLoading = false;
     @track error;
     @track bookingConfirmed = false;
@@ -20,6 +24,53 @@ export default class CalendarBooking extends LightningElement {
 
     connectedCallback() {
         this.loadEventTypes();
+        this.loadFormFields();
+    }
+
+    async loadFormFields() {
+        try {
+            this.formFields = await getBookingFormFields();
+        } catch (err) {
+            this.formFields = [];
+        }
+    }
+
+    get hasFieldSet() {
+        return this.formFields && this.formFields.length > 0;
+    }
+
+    get renderableFields() {
+        return this.formFields.map(f => ({
+            ...f,
+            isLookup: f.type === 'REFERENCE',
+            isEmail: f.type === 'EMAIL',
+            isText: f.type === 'STRING' || f.type === 'TEXT',
+            isTextArea: f.type === 'TEXTAREA',
+            isPhone: f.type === 'PHONE',
+            isNumber: f.type === 'DOUBLE' || f.type === 'INTEGER' || f.type === 'CURRENCY',
+            isCheckbox: f.type === 'BOOLEAN',
+            isDate: f.type === 'DATE',
+            isDateTime: f.type === 'DATETIME',
+            isContactLookup: f.apiName === 'Booker_Contact__c',
+            isRequired: f.required === 'true',
+            value: this.fieldValues[f.apiName] || ''
+        }));
+    }
+
+    handleFieldChange(event) {
+        const fieldName = event.target.dataset.field;
+        this.fieldValues = { ...this.fieldValues, [fieldName]: event.target.value };
+        if (fieldName === 'Booker_Name__c') {
+            this.bookerName = event.target.value;
+        }
+        if (fieldName === 'Booker_Email__c') {
+            this.bookerEmail = event.target.value;
+        }
+    }
+
+    handleContactSelect(event) {
+        const selectedId = event.detail.value && event.detail.value.length > 0 ? event.detail.value[0] : null;
+        this.fieldValues = { ...this.fieldValues, Booker_Contact__c: selectedId };
     }
 
     async loadEventTypes() {
@@ -93,13 +144,24 @@ export default class CalendarBooking extends LightningElement {
         this.isLoading = true;
         this.error = undefined;
         try {
-            this.confirmedBooking = await createBooking({
-                eventTypeId: this.selectedEventType.Id,
-                startDateTimeStr: this.selectedSlot.startTime,
-                bookerEmail: this.bookerEmail,
-                bookerName: this.bookerName,
-                attendeeEmails: []
-            });
+            if (this.hasFieldSet) {
+                const values = { ...this.fieldValues };
+                if (!values.Booker_Name__c) values.Booker_Name__c = this.bookerName;
+                if (!values.Booker_Email__c) values.Booker_Email__c = this.bookerEmail;
+                this.confirmedBooking = await createBookingWithFields({
+                    eventTypeId: this.selectedEventType.Id,
+                    startDateTimeStr: this.selectedSlot.startTime,
+                    fieldValues: values
+                });
+            } else {
+                this.confirmedBooking = await createBooking({
+                    eventTypeId: this.selectedEventType.Id,
+                    startDateTimeStr: this.selectedSlot.startTime,
+                    bookerEmail: this.bookerEmail,
+                    bookerName: this.bookerName,
+                    attendeeEmails: []
+                });
+            }
             this.bookingConfirmed = true;
             this.currentStep = 'confirmation';
         } catch (err) {
@@ -160,8 +222,28 @@ export default class CalendarBooking extends LightningElement {
         return this.currentStep === 'confirmation';
     }
 
+    get isPendingBooking() {
+        return this.confirmedBooking && this.confirmedBooking.Status__c === 'Pending';
+    }
+
+    get confirmationHeading() {
+        return this.isPendingBooking ? 'Booking Pending Approval' : 'Booking Confirmed!';
+    }
+
+    get confirmationIcon() {
+        return this.isPendingBooking ? 'action:submit_for_approval' : 'action:approval';
+    }
+
     get hasSlots() {
         return this.availableSlots && this.availableSlots.length > 0;
+    }
+
+    get noSlots() {
+        return !this.hasSlots;
+    }
+
+    get notLoading() {
+        return !this.isLoading;
     }
 
     get formattedSlots() {

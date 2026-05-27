@@ -56,6 +56,23 @@ private class CalendarIntegrationServiceTest {
         User testUser = SchedulingTestDataFactory.createTestUser();
 
         System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Test', 30);
+            Datetime startDt = Datetime.now().addDays(7);
+            String hex = EncodingUtil.convertToHex(Crypto.generateAesKey(128));
+            String uid = hex.substring(0,8)+'-'+hex.substring(8,12)+'-'+hex.substring(12,16)+'-'+hex.substring(16,20)+'-'+hex.substring(20,32);
+            Booking__c booking = new Booking__c(
+                UID__c = uid,
+                Event_Type__c = eventType.Id,
+                Host__c = testUser.Id,
+                Title__c = 'Test Booking',
+                Start_DateTime__c = startDt,
+                End_DateTime__c = startDt.addMinutes(30),
+                Status__c = 'Pending',
+                Booker_Email__c = 'booker@example.com',
+                Booker_Name__c = 'Test Booker'
+            );
+            insert booking;
+
             Calendar_Connection__c conn = new Calendar_Connection__c(
                 Name = 'Salesforce Calendar',
                 Owner_User__c = testUser.Id,
@@ -64,12 +81,6 @@ private class CalendarIntegrationServiceTest {
                 Push_Events_To__c = true
             );
             insert conn;
-
-            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Test', 30);
-            Datetime startDt = Datetime.now().addDays(7);
-            Booking__c booking = SchedulingTestDataFactory.createBooking(
-                eventType.Id, testUser.Id, startDt, startDt.addMinutes(30)
-            );
 
             Test.startTest();
             String externalId = CalendarIntegrationService.createExternalEvent(booking.Id);
@@ -87,15 +98,6 @@ private class CalendarIntegrationServiceTest {
         User testUser = SchedulingTestDataFactory.createTestUser();
 
         System.runAs(testUser) {
-            Calendar_Connection__c conn = new Calendar_Connection__c(
-                Name = 'Salesforce Calendar',
-                Owner_User__c = testUser.Id,
-                Provider__c = 'Salesforce',
-                Is_Active__c = true,
-                Push_Events_To__c = true
-            );
-            insert conn;
-
             Event sfEvent = new Event(
                 Subject = 'To Delete',
                 StartDateTime = Datetime.now().addDays(7),
@@ -106,11 +108,30 @@ private class CalendarIntegrationServiceTest {
 
             Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Test', 30);
             Datetime startDt = Datetime.now().addDays(7);
-            Booking__c booking = SchedulingTestDataFactory.createBooking(
-                eventType.Id, testUser.Id, startDt, startDt.addMinutes(30)
+            String hex2 = EncodingUtil.convertToHex(Crypto.generateAesKey(128));
+            String uid2 = hex2.substring(0,8)+'-'+hex2.substring(8,12)+'-'+hex2.substring(12,16)+'-'+hex2.substring(16,20)+'-'+hex2.substring(20,32);
+            Booking__c booking = new Booking__c(
+                UID__c = uid2,
+                Event_Type__c = eventType.Id,
+                Host__c = testUser.Id,
+                Title__c = 'Test Booking',
+                Start_DateTime__c = startDt,
+                End_DateTime__c = startDt.addMinutes(30),
+                Status__c = 'Pending',
+                Booker_Email__c = 'booker@example.com',
+                Booker_Name__c = 'Test Booker',
+                External_Event_Id__c = sfEvent.Id
             );
-            booking.External_Event_Id__c = sfEvent.Id;
-            update booking;
+            insert booking;
+
+            Calendar_Connection__c conn = new Calendar_Connection__c(
+                Name = 'Salesforce Calendar',
+                Owner_User__c = testUser.Id,
+                Provider__c = 'Salesforce',
+                Is_Active__c = true,
+                Push_Events_To__c = true
+            );
+            insert conn;
 
             Test.startTest();
             CalendarIntegrationService.deleteExternalEvent(booking.Id);

@@ -1,10 +1,5 @@
 public with sharing class AvailabilityService {
 
-    private static final Map<String, Integer> DAY_INDEX_MAP = new Map<String, Integer>{
-        'Sunday' => 0, 'Monday' => 1, 'Tuesday' => 2, 'Wednesday' => 3,
-        'Thursday' => 4, 'Friday' => 5, 'Saturday' => 6
-    };
-
     public static List<Schedule__c> getSchedulesForUser(Id userId) {
         return [
             SELECT Id, Name, Time_Zone__c, Is_Default__c, Owner_User__c,
@@ -13,6 +8,7 @@ public with sharing class AvailabilityService {
                  ORDER BY Start_Time__c ASC)
             FROM Schedule__c
             WHERE Owner_User__c = :userId
+                OR (Owner_User__c = null AND OwnerId = :userId)
             WITH USER_MODE
             ORDER BY Is_Default__c DESC, Name ASC
         ];
@@ -25,7 +21,8 @@ public with sharing class AvailabilityService {
                  FROM Availabilities__r
                  ORDER BY Start_Time__c ASC)
             FROM Schedule__c
-            WHERE Owner_User__c = :userId AND Is_Default__c = true
+            WHERE (Owner_User__c = :userId OR (Owner_User__c = null AND OwnerId = :userId))
+                AND Is_Default__c = true
             WITH USER_MODE
             LIMIT 1
         ];
@@ -36,34 +33,46 @@ public with sharing class AvailabilityService {
     }
 
     public static List<TimeSlot> getAvailableSlots(Id eventTypeId, Date startDate, Date endDate) {
-        Event_Type__c eventType = [
+        List<Event_Type__c> eventTypes = [
             SELECT Id, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
                    Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
                    Slot_Interval_Minutes__c, Booking_Window_Days__c,
-                   Owner_User__c, Schedule__c
+                   Owner_User__c, OwnerId, Schedule__c
             FROM Event_Type__c
             WHERE Id = :eventTypeId
             WITH USER_MODE
             LIMIT 1
         ];
 
-        if (eventType == null) {
+        if (eventTypes.isEmpty()) {
             throw new SchedulingException('EVENT_TYPE_NOT_FOUND', 'Event type not found');
         }
+        Event_Type__c eventType = eventTypes[0];
 
-        Id scheduleId = eventType.Schedule__c;
-        if (scheduleId == null) {
-            Schedule__c defaultSchedule = getDefaultSchedule(eventType.Owner_User__c);
-            if (defaultSchedule == null) {
+        Id hostUserId = SchedulingOwnershipUtil.resolveHostUser(eventType.Owner_User__c, eventType.OwnerId);
+
+        Schedule__c schedule;
+        if (eventType.Schedule__c != null) {
+            List<Schedule__c> schedules = [
+                SELECT Id, Time_Zone__c FROM Schedule__c
+                WHERE Id = :eventType.Schedule__c WITH USER_MODE LIMIT 1
+            ];
+            schedule = schedules.isEmpty() ? null : schedules[0];
+        }
+        if (schedule == null) {
+            schedule = getDefaultSchedule(hostUserId);
+            if (schedule == null) {
                 return new List<TimeSlot>();
             }
-            scheduleId = defaultSchedule.Id;
         }
+
+        String scheduleTimeZone = String.isNotBlank(schedule.Time_Zone__c)
+            ? schedule.Time_Zone__c : UserInfo.getTimeZone().getID();
 
         List<Availability__c> availabilities = [
             SELECT Id, Record_Type__c, Days__c, Start_Time__c, End_Time__c, Override_Date__c
             FROM Availability__c
-            WHERE Schedule__c = :scheduleId
+            WHERE Schedule__c = :schedule.Id
             WITH USER_MODE
             ORDER BY Start_Time__c ASC
         ];
@@ -71,7 +80,7 @@ public with sharing class AvailabilityService {
         List<Booking__c> existingBookings = [
             SELECT Id, Start_DateTime__c, End_DateTime__c
             FROM Booking__c
-            WHERE Host__c = :eventType.Owner_User__c
+            WHERE Host__c = :hostUserId
                 AND Status__c IN ('Accepted', 'Pending')
                 AND End_DateTime__c >= :Datetime.newInstance(startDate, Time.newInstance(0, 0, 0, 0))
                 AND Start_DateTime__c <= :Datetime.newInstance(endDate, Time.newInstance(23, 59, 59, 0))
@@ -82,7 +91,7 @@ public with sharing class AvailabilityService {
         List<CalendarIntegrationService.BusySlot> externalBusy = new List<CalendarIntegrationService.BusySlot>();
         try {
             externalBusy = CalendarIntegrationService.getExternalBusyTimes(
-                eventType.Owner_User__c,
+                hostUserId,
                 Datetime.newInstance(startDate, Time.newInstance(0, 0, 0, 0)),
                 Datetime.newInstance(endDate, Time.newInstance(23, 59, 59, 0))
             );
@@ -90,7 +99,7 @@ public with sharing class AvailabilityService {
             System.debug(LoggingLevel.WARN, 'External calendar check failed: ' + e.getMessage());
         }
 
-        return calculateSlots(eventType, availabilities, existingBookings, externalBusy, startDate, endDate);
+        return calculateSlots(eventType, availabilities, existingBookings, externalBusy, startDate, endDate, scheduleTimeZone);
     }
 
     private static List<TimeSlot> calculateSlots(
@@ -99,7 +108,8 @@ public with sharing class AvailabilityService {
         List<Booking__c> existingBookings,
         List<CalendarIntegrationService.BusySlot> externalBusy,
         Date startDate,
-        Date endDate
+        Date endDate,
+        String scheduleTimeZone
     ) {
         List<TimeSlot> slots = new List<TimeSlot>();
         Integer durationMinutes = (Integer)eventType.Duration_Minutes__c;
@@ -114,15 +124,24 @@ public with sharing class AvailabilityService {
             ? (Integer)eventType.Min_Booking_Notice_Minutes__c : 120;
 
         Datetime minimumStart = Datetime.now().addMinutes(minNotice);
+        Integer bookingWindowDays = eventType.Booking_Window_Days__c != null
+            ? (Integer)eventType.Booking_Window_Days__c : 60;
+        Date maxBookableDate = Date.today().addDays(bookingWindowDays);
+        TimeZone scheduleTz = TimeZone.getTimeZone(scheduleTimeZone);
+        TimeZone userTz = UserInfo.getTimeZone();
 
+        Date effectiveEnd = endDate < maxBookableDate ? endDate : maxBookableDate;
         Date currentDate = startDate;
-        while (currentDate <= endDate) {
-            String dayName = getDayName(currentDate);
+        while (currentDate <= effectiveEnd) {
+            String dayName = getDayName(currentDate, scheduleTz);
             List<Availability__c> applicableWindows = getApplicableWindows(availabilities, currentDate, dayName);
 
             for (Availability__c window : applicableWindows) {
-                Datetime windowStart = Datetime.newInstance(currentDate, window.Start_Time__c);
-                Datetime windowEnd = Datetime.newInstance(currentDate, window.End_Time__c);
+                Datetime windowStartLocal = Datetime.newInstance(currentDate, window.Start_Time__c);
+                Datetime windowEndLocal = Datetime.newInstance(currentDate, window.End_Time__c);
+                Integer tzDeltaMs = userTz.getOffset(windowStartLocal) - scheduleTz.getOffset(windowStartLocal);
+                Datetime windowStart = windowStartLocal.addSeconds(tzDeltaMs / 1000);
+                Datetime windowEnd = windowEndLocal.addSeconds(tzDeltaMs / 1000);
 
                 Datetime slotStart = windowStart;
                 while (slotStart.addMinutes(durationMinutes) <= windowEnd) {
@@ -187,9 +206,9 @@ public with sharing class AvailabilityService {
         return false;
     }
 
-    private static String getDayName(Date d) {
+    private static String getDayName(Date d, TimeZone tz) {
         Datetime dt = Datetime.newInstance(d, Time.newInstance(12, 0, 0, 0));
-        return dt.format('EEEE');
+        return dt.format('EEEE', tz.getID());
     }
 
     public class TimeSlot {

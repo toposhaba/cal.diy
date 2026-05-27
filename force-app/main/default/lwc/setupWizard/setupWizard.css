@@ -1,0 +1,13 @@
+.wizard-container {
+    max-width: 720px;
+    margin: 2rem auto;
+}
+
+.step-content {
+    padding: 1rem 0;
+}
+
+.dashboard-container {
+    max-width: 900px;
+    margin: 2rem auto;
+}

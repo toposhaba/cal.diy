@@ -131,7 +131,7 @@ private class SchedulingControllerTest {
                 futureDate = futureDate.addDays(1);
             }
             Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(10, 0, 0, 0));
-            String startStr = startDt.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+            String startStr = startDt.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
 
             Test.startTest();
             Booking__c booking = SchedulingController.createBooking(
@@ -208,7 +208,7 @@ private class SchedulingControllerTest {
             );
 
             Datetime newStart = Datetime.newInstance(futureDate, Time.newInstance(14, 0, 0, 0));
-            String newStartStr = newStart.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+            String newStartStr = newStart.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
 
             Test.startTest();
             Booking__c result = SchedulingController.rescheduleBooking(booking.Id, newStartStr);

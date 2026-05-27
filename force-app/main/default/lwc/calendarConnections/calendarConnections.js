@@ -41,6 +41,14 @@ export default class CalendarConnections extends LightningElement {
         return this.connections && this.connections.length > 0;
     }
 
+    get noConnections() {
+        return !this.hasConnections;
+    }
+
+    get notLoading() {
+        return !this.isLoading;
+    }
+
     get formattedConnections() {
         return this.connections.map(conn => ({
             ...conn,

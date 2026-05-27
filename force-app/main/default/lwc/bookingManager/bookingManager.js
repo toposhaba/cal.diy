@@ -105,6 +105,14 @@ export default class BookingManager extends LightningElement {
         return this.bookings && this.bookings.length > 0;
     }
 
+    get noBookings() {
+        return !this.hasBookings;
+    }
+
+    get notLoading() {
+        return !this.isLoading;
+    }
+
     get formattedBookings() {
         return this.bookings.map(b => ({
             ...b,

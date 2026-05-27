@@ -1,0 +1,33 @@
+.utility-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.utility-header {
+    border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+}
+
+.booking-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.booking-item {
+    border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+    cursor: pointer;
+    transition: background-color 0.1s;
+}
+
+.booking-item:hover {
+    background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+.booking-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.utility-footer {
+    border-top: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+}

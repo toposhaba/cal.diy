@@ -4,7 +4,7 @@
     <description>External calendar identifier (e.g. primary for Google, calendar ID for Outlook)</description>
     <externalId>false</externalId>
     <label>Calendar ID</label>
-    <length>500</length>
+    <length>255</length>
     <required>false</required>
     <type>Text</type>
     <unique>false</unique>

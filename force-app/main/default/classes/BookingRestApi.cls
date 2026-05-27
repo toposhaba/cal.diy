@@ -35,11 +35,11 @@ global with sharing class BookingRestApi {
         String path = req.requestURI.substringAfter('/scheduling/v1/');
 
         try {
-            if (path.startsWith('bookings')) {
-                handleCreateBooking(req, res);
-            } else if (path.startsWith('bookings/') && path.endsWith('/cancel')) {
+            if (path.startsWith('bookings/') && path.endsWith('/cancel')) {
                 String bookingUid = path.substringBetween('bookings/', '/cancel');
                 handleCancelBooking(bookingUid, req, res);
+            } else if (path == 'bookings') {
+                handleCreateBooking(req, res);
             } else {
                 res.statusCode = 404;
                 res.responseBody = Blob.valueOf(JSON.serialize(new ApiError('NOT_FOUND', 'Endpoint not found')));
@@ -83,7 +83,8 @@ global with sharing class BookingRestApi {
         List<Event_Type__c> eventTypes = [
             SELECT Id, Name, Slug__c, Duration_Minutes__c, Description__c, Location__c
             FROM Event_Type__c
-            WHERE Owner_User__c = :hostUserId AND Is_Active__c = true
+            WHERE (Owner_User__c = :hostUserId OR (Owner_User__c = null AND OwnerId = :hostUserId))
+                AND Is_Active__c = true
             WITH USER_MODE
             ORDER BY Name ASC
         ];
@@ -197,8 +198,11 @@ global with sharing class BookingRestApi {
             return;
         }
 
-        Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(req.requestBody.toString());
-        String reason = (String) body.get('reason');
+        String reason;
+        if (req.requestBody != null) {
+            Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(req.requestBody.toString());
+            reason = (String) body.get('reason');
+        }
 
         try {
             Booking__c cancelled = BookingService.cancelBooking(bookings[0].Id, reason);

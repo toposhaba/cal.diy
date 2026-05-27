@@ -1,0 +1,253 @@
+<template>
+    <template lwc:if={isLoading}>
+        <div class="slds-align_absolute-center slds-p-around_xx-large">
+            <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+        </div>
+    </template>
+
+    <template lwc:if={error}>
+        <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
+            <span class="slds-assistive-text">error</span>
+            <h2>{error}</h2>
+        </div>
+    </template>
+
+    <!-- Wizard -->
+    <template lwc:if={isWizard}>
+        <div class="wizard-container slds-card slds-p-around_large">
+            <div class="slds-m-bottom_large">
+                <h1 class="slds-text-heading_large slds-m-bottom_x-small">Welcome to Cal.DIY</h1>
+                <p class="slds-text-body_regular slds-text-color_weak">Let's get your scheduling set up in a few quick steps.</p>
+            </div>
+
+            <lightning-progress-indicator current-step={currentStep} type="path" class="slds-m-bottom_large">
+                <template for:each={steps} for:item="step">
+                    <lightning-progress-step key={step.value} label={step.label} value={step.value}></lightning-progress-step>
+                </template>
+            </lightning-progress-indicator>
+
+            <!-- Step 1: Timezone -->
+            <template lwc:if={isTimezoneStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Confirm Your Timezone</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        This determines when your availability windows are displayed to people booking with you.
+                    </p>
+                    <lightning-combobox
+                        label="Timezone"
+                        value={selectedTimeZone}
+                        options={timezoneOptions}
+                        onchange={handleTimezoneChange}
+                        class="slds-m-bottom_medium"
+                    ></lightning-combobox>
+                    <div class="slds-m-top_large">
+                        <lightning-button label="Next" variant="brand" onclick={handleNextFromTimezone}></lightning-button>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Step 2: Calendar Connection -->
+            <template lwc:if={isCalendarStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Connect a Calendar</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        Connect your calendar to automatically check for conflicts and push new bookings. You can skip this and do it later.
+                    </p>
+
+                    <template lwc:if={showOAuthInstructions}>
+                        <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                            <h3 class="slds-text-heading_small slds-m-bottom_small">Authorize {calendarProvider} Calendar</h3>
+                            <p class="slds-text-body_regular slds-m-bottom_medium">
+                                To connect your calendar, you need to authorize Cal.DIY to access it via Named Credentials:
+                            </p>
+                            <ol class="slds-list_ordered slds-m-bottom_medium">
+                                <li class="slds-m-bottom_x-small">Click <strong>Open Setup</strong> below to open the Named Credentials page</li>
+                                <li class="slds-m-bottom_x-small">Find the <strong>{calendarProvider} Calendar</strong> Named Credential</li>
+                                <li class="slds-m-bottom_x-small">Under <strong>External Credential</strong>, click the credential name</li>
+                                <li class="slds-m-bottom_x-small">In the <strong>Permission Set Mappings</strong> section, find your mapping and click <strong>Authenticate</strong></li>
+                                <li class="slds-m-bottom_x-small">Complete the OAuth sign-in with your calendar account</li>
+                                <li class="slds-m-bottom_x-small">Return here and click <strong>Verify Connection</strong></li>
+                            </ol>
+                            <div class="slds-grid slds-gutters_small slds-m-bottom_medium">
+                                <div class="slds-col">
+                                    <lightning-button label="Open Setup" variant="brand" onclick={handleOpenOAuthSetup} icon-name="utility:new_window"></lightning-button>
+                                </div>
+                                <div class="slds-col">
+                                    <lightning-button label="Verify Connection" variant="success" onclick={handleVerifyOAuth} icon-name="utility:check"></lightning-button>
+                                </div>
+                            </div>
+                            <lightning-button label="Skip for now" variant="neutral" onclick={handleSkipOAuth}></lightning-button>
+                        </div>
+                    </template>
+
+                    <template lwc:if={notShowingOAuth}>
+                        <lightning-combobox
+                            label="Calendar Provider"
+                            value={calendarProvider}
+                            options={providerOptions}
+                            onchange={handleProviderChange}
+                            placeholder="Select a provider..."
+                            class="slds-m-bottom_small"
+                        ></lightning-combobox>
+                        <lightning-input
+                            type="text"
+                            label="Calendar ID (optional)"
+                            value={calendarId}
+                            onchange={handleCalendarIdChange}
+                            placeholder="Leave blank for primary calendar"
+                            class="slds-m-bottom_small"
+                        ></lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            label="Check for scheduling conflicts"
+                            checked={calendarCheckConflicts}
+                            onchange={handleCheckConflictsChange}
+                            class="slds-m-bottom_small"
+                        ></lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            label="Push new bookings to this calendar"
+                            checked={calendarPushEvents}
+                            onchange={handlePushEventsChange}
+                            class="slds-m-bottom_small"
+                        ></lightning-input>
+                        <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                            <lightning-button label="Back" onclick={handleBackToTimezone}></lightning-button>
+                            <div>
+                                <lightning-button label="Skip" onclick={handleSkipCalendar} class="slds-m-right_small"></lightning-button>
+                                <lightning-button label="Connect & Continue" variant="brand" onclick={handleConnectCalendar}></lightning-button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Step 3: Schedule + Availability -->
+            <template lwc:if={isAvailabilityStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Set Your Availability</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        Define your working hours so people know when you're available for meetings.
+                    </p>
+                    <lightning-input
+                        type="text"
+                        label="Schedule Name"
+                        value={scheduleName}
+                        onchange={handleScheduleNameChange}
+                        required
+                        class="slds-m-bottom_small"
+                    ></lightning-input>
+                    <lightning-dual-listbox
+                        label="Available Days"
+                        source-label="Available"
+                        selected-label="Selected"
+                        options={dayOptions}
+                        value={selectedDaysArray}
+                        onchange={handleDaysChange}
+                        required
+                        class="slds-m-bottom_small"
+                    ></lightning-dual-listbox>
+                    <div class="slds-grid slds-gutters_small slds-m-bottom_small">
+                        <div class="slds-col">
+                            <lightning-input
+                                type="time"
+                                label="Start Time"
+                                value={availabilityStartTime}
+                                onchange={handleStartTimeChange}
+                                required
+                            ></lightning-input>
+                        </div>
+                        <div class="slds-col">
+                            <lightning-input
+                                type="time"
+                                label="End Time"
+                                value={availabilityEndTime}
+                                onchange={handleEndTimeChange}
+                                required
+                            ></lightning-input>
+                        </div>
+                    </div>
+                    <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                        <lightning-button label="Back" onclick={handleBackToCalendar}></lightning-button>
+                        <lightning-button label="Create Schedule" variant="brand" onclick={handleCreateSchedule}></lightning-button>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Step 4: Event Type -->
+            <template lwc:if={isEventTypeStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Create Your First Event Type</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        An event type is the kind of meeting people can book with you (e.g. "30 Minute Call", "1 Hour Consultation").
+                    </p>
+                    <lightning-input
+                        type="text"
+                        label="Event Type Name"
+                        value={eventTypeName}
+                        onchange={handleEventTypeNameChange}
+                        required
+                        class="slds-m-bottom_small"
+                    ></lightning-input>
+                    <lightning-input
+                        type="number"
+                        label="Duration (minutes)"
+                        value={eventTypeDuration}
+                        onchange={handleEventTypeDurationChange}
+                        min="5"
+                        max="480"
+                        required
+                        class="slds-m-bottom_small"
+                    ></lightning-input>
+                    <lightning-textarea
+                        label="Description (optional)"
+                        value={eventTypeDescription}
+                        onchange={handleEventTypeDescriptionChange}
+                        placeholder="Brief description shown on your booking page"
+                        class="slds-m-bottom_small"
+                    ></lightning-textarea>
+                    <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                        <lightning-button label="Back" onclick={handleBackToAvailability}></lightning-button>
+                        <lightning-button label="Finish Setup" variant="brand" onclick={handleCreateEventType}></lightning-button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- Dashboard -->
+    <template lwc:if={isDashboard}>
+        <div class="dashboard-container">
+            <lightning-card title="Cal.DIY - You're All Set!" icon-name="standard:event">
+                <div class="slds-p-around_medium">
+                    <div class="slds-grid slds-wrap slds-gutters_small">
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_small">
+                            <div class="slds-box slds-box_small slds-text-align_center">
+                                <p class="slds-text-title_caps slds-m-bottom_xx-small">Timezone</p>
+                                <p class="slds-text-heading_small">{dashboardData.timezone}</p>
+                            </div>
+                        </div>
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_small">
+                            <div class="slds-box slds-box_small slds-text-align_center">
+                                <p class="slds-text-title_caps slds-m-bottom_xx-small">Event Types</p>
+                                <p class="slds-text-heading_small">{dashboardData.eventTypeCount} active</p>
+                            </div>
+                        </div>
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_small">
+                            <div class="slds-box slds-box_small slds-text-align_center">
+                                <p class="slds-text-title_caps slds-m-bottom_xx-small">Schedules</p>
+                                <p class="slds-text-heading_small">{dashboardData.scheduleCount} configured</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="slds-m-top_medium slds-text-align_center">
+                        <p class="slds-text-body_regular slds-m-bottom_small">
+                            Your booking page is ready. Share the <strong>Calendar Booking</strong> tab with anyone who needs to schedule time with you.
+                        </p>
+                        <lightning-button label="Run Setup Again" variant="neutral" onclick={handleRestartWizard} class="slds-m-right_small"></lightning-button>
+                    </div>
+                </div>
+            </lightning-card>
+        </div>
+    </template>
+</template>

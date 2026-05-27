@@ -14,6 +14,10 @@ Thumbs.db
 # Node (for LWC testing tooling)
 node_modules/
 
+# Test results
+test/e2e/results/*.xml
+test-results/
+
 # Environment
 .env
 .env.local

@@ -1,0 +1,80 @@
+name: CI - Deploy & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  apex-tests:
+    name: Deploy & Run Apex Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+
+      - name: Authenticate to Org
+        run: |
+          echo "${{ secrets.SF_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias ci-org --set-default
+          rm auth.txt
+
+      - name: Deploy Source
+        run: sf project deploy start --target-org ci-org --wait 30
+
+      - name: Run Apex Tests
+        run: sf apex run test --target-org ci-org --test-level RunLocalTests --wait 15 --code-coverage --result-format json --output-dir test-results
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-test-results
+          path: test-results/
+
+  e2e-tests:
+    name: E2E Browser Tests
+    runs-on: ubuntu-latest
+    needs: apex-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+
+      - name: Authenticate & Get Frontdoor URL
+        run: |
+          echo "${{ secrets.SF_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias ci-org --set-default
+          rm auth.txt
+          FRONTDOOR=$(sf org open --target-org ci-org --url-only --json | jq -r '.result.url')
+          echo "SF_FRONTDOOR_URL=$FRONTDOOR" >> $GITHUB_ENV
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Run E2E Tests
+        run: npx wdio run wdio.conf.js
+        env:
+          HEADLESS: 'true'
+          SF_FRONTDOOR_URL: ${{ env.SF_FRONTDOOR_URL }}
+
+      - name: Upload E2E Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test/e2e/results/

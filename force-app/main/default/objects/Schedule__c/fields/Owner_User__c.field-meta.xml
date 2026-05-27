@@ -7,6 +7,7 @@
     <referenceTo>User</referenceTo>
     <relationshipLabel>Schedules</relationshipLabel>
     <relationshipName>Schedules</relationshipName>
-    <required>true</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
     <type>Lookup</type>
 </CustomField>

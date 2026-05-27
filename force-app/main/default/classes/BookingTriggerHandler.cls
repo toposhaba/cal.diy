@@ -92,6 +92,8 @@ public with sharing class BookingTriggerHandler {
 
         if (!rescheduledIds.isEmpty()) {
             BookingNotificationService.sendRescheduleNotice(rescheduledIds);
+            removeFromExternalCalendars(rescheduledIds);
+            syncToExternalCalendars(rescheduledIds);
         }
 
         if (!events.isEmpty()) {

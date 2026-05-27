@@ -17,6 +17,20 @@ public class SchedulingTestDataFactory {
             LanguageLocaleKey = 'en_US'
         );
         insert u;
+
+        List<PermissionSet> permSets = [
+            SELECT Id FROM PermissionSet
+            WHERE Name IN ('Scheduling_Host', 'Scheduling_Admin')
+        ];
+        List<PermissionSetAssignment> assignments = new List<PermissionSetAssignment>();
+        for (PermissionSet ps : permSets) {
+            assignments.add(new PermissionSetAssignment(
+                AssigneeId = u.Id,
+                PermissionSetId = ps.Id
+            ));
+        }
+        insert assignments;
+
         return u;
     }
 

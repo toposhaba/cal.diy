@@ -2,7 +2,7 @@ public with sharing class CalendarIntegrationService {
 
     public static List<BusySlot> getExternalBusyTimes(Id userId, Datetime rangeStart, Datetime rangeEnd) {
         List<Calendar_Connection__c> connections = [
-            SELECT Id, Provider__c, Calendar_Id__c, Check_For_Conflicts__c
+            SELECT Id, Provider__c, Calendar_Id__c, Check_For_Conflicts__c, Owner_User__c
             FROM Calendar_Connection__c
             WHERE Owner_User__c = :userId
                 AND Is_Active__c = true
@@ -25,7 +25,7 @@ public with sharing class CalendarIntegrationService {
     }
 
     public static String createExternalEvent(Id bookingId) {
-        Booking__c booking = [
+        List<Booking__c> bookingList = [
             SELECT Id, Title__c, Start_DateTime__c, End_DateTime__c, Location__c,
                    Booker_Email__c, Booker_Name__c, Host__c,
                    Event_Type__r.Description__c
@@ -35,9 +35,10 @@ public with sharing class CalendarIntegrationService {
             LIMIT 1
         ];
 
-        if (booking == null) {
+        if (bookingList.isEmpty()) {
             throw new SchedulingException('BOOKING_NOT_FOUND', 'Booking not found for calendar sync');
         }
+        Booking__c booking = bookingList[0];
 
         List<Calendar_Connection__c> connections = [
             SELECT Id, Provider__c, Calendar_Id__c
@@ -66,7 +67,7 @@ public with sharing class CalendarIntegrationService {
     }
 
     public static void deleteExternalEvent(Id bookingId) {
-        Booking__c booking = [
+        List<Booking__c> bookingList = [
             SELECT Id, External_Event_Id__c, Host__c
             FROM Booking__c
             WHERE Id = :bookingId AND External_Event_Id__c != null
@@ -74,7 +75,8 @@ public with sharing class CalendarIntegrationService {
             LIMIT 1
         ];
 
-        if (booking == null) return;
+        if (bookingList.isEmpty()) return;
+        Booking__c booking = bookingList[0];
 
         List<Calendar_Connection__c> connections = [
             SELECT Id, Provider__c, Calendar_Id__c
@@ -170,7 +172,6 @@ public with sharing class CalendarIntegrationService {
             WHERE OwnerId = :conn.Owner_User__c
                 AND StartDateTime < :rangeEnd
                 AND EndDateTime > :rangeStart
-                AND IsDeleted = false
             WITH USER_MODE
             ORDER BY StartDateTime ASC
         ];

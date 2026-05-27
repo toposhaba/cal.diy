@@ -58,8 +58,8 @@
                 </table>
             </template>
 
-            <template lwc:if={!hasBookings}>
-                <template lwc:if={!isLoading}>
+            <template lwc:if={noBookings}>
+                <template lwc:if={notLoading}>
                     <div class="slds-align_absolute-center slds-p-around_large">
                         <p class="slds-text-color_weak">No bookings found for this period.</p>
                     </div>

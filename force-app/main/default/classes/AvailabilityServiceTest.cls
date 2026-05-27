@@ -40,6 +40,26 @@ private class AvailabilityServiceTest {
     }
 
     @IsTest
+    static void testGetSchedulesForUserWhenOwnerUserBlank() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            insert new Schedule__c(
+                Name = 'UI Created',
+                Time_Zone__c = 'America/New_York',
+                Is_Default__c = true
+            );
+
+            Test.startTest();
+            List<Schedule__c> schedules = AvailabilityService.getSchedulesForUser(testUser.Id);
+            Test.stopTest();
+
+            System.assertEquals(1, schedules.size(), 'Should include schedules owned via OwnerId');
+            System.assertEquals('UI Created', schedules[0].Name);
+        }
+    }
+
+    @IsTest
     static void testGetDefaultScheduleReturnsNullWhenNone() {
         User testUser = SchedulingTestDataFactory.createTestUser();
 

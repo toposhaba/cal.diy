@@ -54,8 +54,8 @@
                                                 <template lwc:if={avail.Days__c}>{avail.Days__c}</template>
                                                 <template lwc:if={avail.Override_Date__c}>{avail.Override_Date__c}</template>
                                             </td>
-                                            <td>{avail.Start_Time__c}</td>
-                                            <td>{avail.End_Time__c}</td>
+                                            <td>{avail.formattedStartTime}</td>
+                                            <td>{avail.formattedEndTime}</td>
                                         </tr>
                                     </template>
                                 </tbody>
@@ -65,8 +65,8 @@
                 </template>
             </template>
 
-            <template lwc:if={!hasSchedules}>
-                <template lwc:if={!isLoading}>
+            <template lwc:if={noSchedules}>
+                <template lwc:if={notLoading}>
                     <div class="slds-align_absolute-center slds-p-around_large">
                         <p class="slds-text-color_weak">No schedules configured. Create one to get started.</p>
                     </div>
