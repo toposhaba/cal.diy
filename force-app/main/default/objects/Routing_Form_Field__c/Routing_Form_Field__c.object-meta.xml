@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>A question field in a routing form</description>
+    <label>Routing Form Field</label>
+    <nameField>
+        <label>Field Label</label>
+        <type>Text</type>
+    </nameField>
+    <pluralLabel>Routing Form Fields</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>
