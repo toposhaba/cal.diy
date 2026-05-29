@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Individual seat reservation within a seated/group booking</description>
+    <label>Booking Seat</label>
+    <nameField>
+        <displayFormat>SEAT-{00000}</displayFormat>
+        <label>Seat ID</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Booking Seats</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

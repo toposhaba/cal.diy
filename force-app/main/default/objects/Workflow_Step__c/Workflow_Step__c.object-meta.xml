@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>A single action step within a scheduling workflow</description>
+    <label>Workflow Step</label>
+    <nameField>
+        <displayFormat>WS-{00000}</displayFormat>
+        <label>Step ID</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Workflow Steps</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

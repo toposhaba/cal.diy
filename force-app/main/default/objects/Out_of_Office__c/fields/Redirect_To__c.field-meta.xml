@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Redirect_To__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Optional user to redirect bookings to during OOO period</description>
+    <label>Redirect To</label>
+    <referenceTo>User</referenceTo>
+    <relationshipLabel>OOO Redirects Received</relationshipLabel>
+    <relationshipName>OOO_Redirects</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>

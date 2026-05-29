@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Links a host user to a team event type with scheduling configuration</description>
+    <label>Event Type Host</label>
+    <nameField>
+        <displayFormat>ETH-{00000}</displayFormat>
+        <label>Host Assignment ID</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Event Type Hosts</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

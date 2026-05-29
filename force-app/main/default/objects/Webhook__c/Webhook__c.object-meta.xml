@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Outbound webhook subscription for booking events</description>
+    <label>Webhook</label>
+    <nameField>
+        <label>Webhook Name</label>
+        <type>Text</type>
+    </nameField>
+    <pluralLabel>Webhooks</pluralLabel>
+    <sharingModel>Private</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

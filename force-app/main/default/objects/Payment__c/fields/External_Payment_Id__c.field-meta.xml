@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>External_Payment_Id__c</fullName>
+    <description>Stripe payment intent ID or external payment reference</description>
+    <externalId>true</externalId>
+    <label>External Payment ID</label>
+    <length>255</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
