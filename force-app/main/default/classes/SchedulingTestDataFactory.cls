@@ -119,6 +119,112 @@ public class SchedulingTestDataFactory {
         return booking;
     }
 
+    public static Calendar_Connection__c createCalendarConnection(Id userId, String provider, Boolean pushEvents) {
+        Calendar_Connection__c connection = new Calendar_Connection__c(
+            Name = provider + ' Connection',
+            Owner_User__c = userId,
+            Provider__c = provider,
+            Is_Active__c = true,
+            Push_Events_To__c = pushEvents,
+            Check_For_Conflicts__c = true
+        );
+        insert connection;
+        return connection;
+    }
+
+    public static Webhook__c createWebhook(Id userId, String eventName, String url) {
+        Webhook__c webhook = new Webhook__c(
+            Name = 'Test Webhook',
+            Owner_User__c = userId,
+            URL__c = url,
+            Events__c = eventName,
+            Is_Active__c = true
+        );
+        insert webhook;
+        return webhook;
+    }
+
+    public static Workflow__c createWorkflow(String triggerEvent, Id eventTypeId, String recipient, String template) {
+        Workflow__c workflow = new Workflow__c(
+            Name = 'Test Workflow',
+            Trigger_Event__c = triggerEvent,
+            Is_Active__c = true,
+            Event_Type__c = eventTypeId
+        );
+        insert workflow;
+
+        insert new Workflow_Step__c(
+            Workflow__c = workflow.Id,
+            Action_Type__c = 'Email',
+            Recipient__c = recipient,
+            Template__c = template,
+            Sort_Order__c = 1
+        );
+
+        return workflow;
+    }
+
+    public static Team__c createTeam(Id userId, String name) {
+        Team__c team = new Team__c(
+            Name = name,
+            Slug__c = name.toLowerCase().replaceAll(' ', '-') + '-' + String.valueOf(Datetime.now().getTime()),
+            Time_Zone__c = 'America/New_York'
+        );
+        insert team;
+
+        insert new Team_Member__c(
+            Team__c = team.Id,
+            User__c = userId,
+            Role__c = 'Admin'
+        );
+
+        return team;
+    }
+
+    public static Event_Type_Host__c createEventTypeHost(Id eventTypeId, Id userId, Decimal weight, Boolean isFixed) {
+        Event_Type_Host__c host = new Event_Type_Host__c(
+            Event_Type__c = eventTypeId,
+            User__c = userId,
+            Weight__c = weight,
+            Is_Fixed__c = isFixed,
+            Priority__c = 1
+        );
+        insert host;
+        return host;
+    }
+
+    public static Event_Type__c createTeamEventType(
+        Id userId, String name, Integer durationMinutes, String schedulingType, List<Id> hostUserIds
+    ) {
+        Event_Type__c eventType = createEventType(userId, name, durationMinutes);
+        eventType.Scheduling_Type__c = schedulingType;
+        update eventType;
+
+        List<Event_Type_Host__c> hosts = new List<Event_Type_Host__c>();
+        for (Id hostUserId : hostUserIds) {
+            hosts.add(new Event_Type_Host__c(
+                Event_Type__c = eventType.Id,
+                User__c = hostUserId,
+                Priority__c = 1,
+                Weight__c = 100,
+                Is_Fixed__c = schedulingType == 'Managed'
+            ));
+        }
+        insert hosts;
+        return eventType;
+    }
+
+    public static Out_of_Office__c createOutOfOffice(Id userId, Date startDate, Date endDate) {
+        Out_of_Office__c ooo = new Out_of_Office__c(
+            User__c = userId,
+            Start_Date__c = startDate,
+            End_Date__c = endDate,
+            Reason__c = 'Out of office'
+        );
+        insert ooo;
+        return ooo;
+    }
+
     private static String generateUID() {
         Blob randomBytes = Crypto.generateAesKey(128);
         String hex = EncodingUtil.convertToHex(randomBytes);

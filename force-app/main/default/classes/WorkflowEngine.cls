@@ -1,7 +1,13 @@
 public with sharing class WorkflowEngine {
 
     public static void executeWorkflows(String triggerEvent, List<Id> bookingIds) {
-        if (bookingIds == null || bookingIds.isEmpty()) return;
+        if (bookingIds == null || bookingIds.isEmpty()) {
+            return;
+        }
+        if (!Schema.getGlobalDescribe().containsKey('Workflow__c')
+            || !Schema.sObjectType.Workflow__c.isAccessible()) {
+            return;
+        }
 
         List<Booking__c> bookings = [
             SELECT Id, Event_Type__c, Host__c, Host__r.Email, Host__r.Name,
@@ -40,6 +46,11 @@ public with sharing class WorkflowEngine {
     }
 
     public static void scheduleReminderWorkflows() {
+        if (!Schema.getGlobalDescribe().containsKey('Workflow__c')
+            || !Schema.sObjectType.Workflow__c.isAccessible()) {
+            return;
+        }
+
         List<Workflow__c> reminderWorkflows = [
             SELECT Id, Trigger_Event__c, Time_Offset_Minutes__c, Event_Type__c,
                 (SELECT Id, Action_Type__c, Recipient__c, Template__c, Webhook_URL__c
@@ -70,6 +81,24 @@ public with sharing class WorkflowEngine {
                     LIMIT 100
                 ];
                 for (Booking__c booking : upcomingBookings) {
+                    if (workflow.Event_Type__c == null || workflow.Event_Type__c == booking.Event_Type__c) {
+                        executeSteps(workflow.Steps__r, booking);
+                    }
+                }
+            } else if (workflow.Trigger_Event__c == 'After_Event') {
+                Datetime windowStart = Datetime.now().addMinutes(-offsetMinutes);
+                List<Booking__c> completedBookings = [
+                    SELECT Id, Host__c, Host__r.Email, Host__r.Name,
+                           Booker_Email__c, Booker_Name__c, Title__c,
+                           Start_DateTime__c, End_DateTime__c, Location__c, Event_Type__c
+                    FROM Booking__c
+                    WHERE Status__c = 'Accepted'
+                        AND End_DateTime__c <= :Datetime.now()
+                        AND End_DateTime__c >= :windowStart
+                    WITH USER_MODE
+                    LIMIT 100
+                ];
+                for (Booking__c booking : completedBookings) {
                     if (workflow.Event_Type__c == null || workflow.Event_Type__c == booking.Event_Type__c) {
                         executeSteps(workflow.Steps__r, booking);
                     }

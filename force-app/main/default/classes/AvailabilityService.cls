@@ -37,6 +37,39 @@ public with sharing class AvailabilityService {
             SELECT Id, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
                    Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
                    Slot_Interval_Minutes__c, Booking_Window_Days__c,
+                   Owner_User__c, OwnerId, Schedule__c, Scheduling_Type__c
+            FROM Event_Type__c
+            WHERE Id = :eventTypeId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+
+        if (eventTypes.isEmpty()) {
+            throw new SchedulingException('EVENT_TYPE_NOT_FOUND', 'Event type not found');
+        }
+        Event_Type__c eventType = eventTypes[0];
+        String schedulingType = String.isBlank(eventType.Scheduling_Type__c)
+            ? 'Individual' : eventType.Scheduling_Type__c;
+
+        if (schedulingType == 'Collective') {
+            return TeamSchedulingService.getCollectiveAvailableSlots(eventTypeId, startDate, endDate);
+        }
+        if (schedulingType == 'Round_Robin') {
+            return TeamSchedulingService.getRoundRobinAvailableSlots(eventTypeId, startDate, endDate);
+        }
+
+        List<Id> hosts = TeamSchedulingService.resolveHostsForAvailability(eventType);
+        if (hosts.isEmpty()) {
+            return new List<TimeSlot>();
+        }
+        return getAvailableSlotsForHost(eventTypeId, hosts[0], startDate, endDate);
+    }
+
+    public static List<TimeSlot> getAvailableSlotsForHost(Id eventTypeId, Id hostUserId, Date startDate, Date endDate) {
+        List<Event_Type__c> eventTypes = [
+            SELECT Id, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
+                   Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
+                   Slot_Interval_Minutes__c, Booking_Window_Days__c,
                    Owner_User__c, OwnerId, Schedule__c
             FROM Event_Type__c
             WHERE Id = :eventTypeId
@@ -48,8 +81,6 @@ public with sharing class AvailabilityService {
             throw new SchedulingException('EVENT_TYPE_NOT_FOUND', 'Event type not found');
         }
         Event_Type__c eventType = eventTypes[0];
-
-        Id hostUserId = SchedulingOwnershipUtil.resolveHostUser(eventType.Owner_User__c, eventType.OwnerId);
 
         Schedule__c schedule;
         if (eventType.Schedule__c != null) {
@@ -99,7 +130,17 @@ public with sharing class AvailabilityService {
             System.debug(LoggingLevel.WARN, 'External calendar check failed: ' + e.getMessage());
         }
 
-        return calculateSlots(eventType, availabilities, existingBookings, externalBusy, startDate, endDate, scheduleTimeZone);
+        List<TimeSlot> slots = calculateSlots(
+            eventType, availabilities, existingBookings, externalBusy, startDate, endDate, scheduleTimeZone
+        );
+
+        List<TimeSlot> availableSlots = new List<TimeSlot>();
+        for (TimeSlot slot : slots) {
+            if (TeamSchedulingService.isHostAvailableForSlot(hostUserId, slot.startTime, slot.endTime)) {
+                availableSlots.add(slot);
+            }
+        }
+        return availableSlots;
     }
 
     private static List<TimeSlot> calculateSlots(
@@ -218,6 +259,15 @@ public with sharing class AvailabilityService {
         public TimeSlot(Datetime startTime, Datetime endTime) {
             this.startTime = startTime;
             this.endTime = endTime;
+        }
+    }
+
+    public class TimeSlotComparator implements Comparator<TimeSlot> {
+        public Integer compare(TimeSlot left, TimeSlot right) {
+            if (left.startTime == right.startTime) {
+                return 0;
+            }
+            return left.startTime < right.startTime ? -1 : 1;
         }
     }
 }

@@ -2,6 +2,11 @@ public with sharing class WebhookService {
 
     @future(callout=true)
     public static void fireWebhooks(String eventName, String payloadJson) {
+        if (!Schema.getGlobalDescribe().containsKey('Webhook__c')
+            || !Schema.sObjectType.Webhook__c.isAccessible()) {
+            return;
+        }
+
         List<Webhook__c> webhooks = [
             SELECT Id, URL__c, Secret__c, Events__c
             FROM Webhook__c

@@ -5,6 +5,7 @@
     <referenceTo>User</referenceTo>
     <relationshipLabel>Travel Schedules</relationshipLabel>
     <relationshipName>Travel_Schedules</relationshipName>
-    <required>true</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
     <type>Lookup</type>
 </CustomField>

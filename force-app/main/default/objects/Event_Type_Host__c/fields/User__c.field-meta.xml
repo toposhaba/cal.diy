@@ -5,6 +5,7 @@
     <referenceTo>User</referenceTo>
     <relationshipLabel>Event Type Assignments</relationshipLabel>
     <relationshipName>Event_Type_Assignments</relationshipName>
-    <required>true</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
     <type>Lookup</type>
 </CustomField>

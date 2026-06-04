@@ -11,12 +11,15 @@ public with sharing class BookingTriggerHandler {
     private static void processNewBookings(List<Booking__c> newBookings) {
         List<Id> confirmedIds = new List<Id>();
         List<Id> pendingIds = new List<Id>();
+        List<Id> createdIds = new List<Id>();
         List<Booking_Event__e> events = new List<Booking_Event__e>();
 
         for (Booking__c booking : newBookings) {
+            createdIds.add(booking.Id);
+
             if (booking.Status__c == 'Accepted') {
                 confirmedIds.add(booking.Id);
-            } else if (booking.Status__c == 'Pending') {
+            } else if (booking.Status__c == 'Pending' || booking.Status__c == 'Pending_Payment') {
                 pendingIds.add(booking.Id);
             }
 
@@ -36,6 +39,8 @@ public with sharing class BookingTriggerHandler {
             BookingNotificationService.sendPendingApprovalNotice(pendingIds);
         }
 
+        fireBookingIntegrations(createdIds, 'booking.created', 'New_Booking');
+
         if (!events.isEmpty()) {
             EventBus.publish(events);
         }
@@ -51,6 +56,15 @@ public with sharing class BookingTriggerHandler {
             Booking__c oldBooking = oldMap.get(booking.Id);
 
             if (oldBooking.Status__c == 'Pending' && booking.Status__c == 'Accepted') {
+                newlyConfirmedIds.add(booking.Id);
+                events.add(new Booking_Event__e(
+                    Booking_Id__c = booking.Id,
+                    Action__c = 'Confirmed',
+                    Status__c = booking.Status__c
+                ));
+            }
+
+            if (oldBooking.Status__c == 'Pending_Payment' && booking.Status__c == 'Accepted') {
                 newlyConfirmedIds.add(booking.Id);
                 events.add(new Booking_Event__e(
                     Booking_Id__c = booking.Id,
@@ -83,22 +97,38 @@ public with sharing class BookingTriggerHandler {
         if (!newlyConfirmedIds.isEmpty()) {
             BookingNotificationService.sendBookingConfirmation(newlyConfirmedIds);
             syncToExternalCalendars(newlyConfirmedIds);
+            fireBookingIntegrations(newlyConfirmedIds, 'booking.confirmed', 'Booking_Confirmed');
         }
 
         if (!cancelledIds.isEmpty()) {
             BookingNotificationService.sendCancellationNotice(cancelledIds);
             removeFromExternalCalendars(cancelledIds);
+            fireBookingIntegrations(cancelledIds, 'booking.cancelled', 'Booking_Cancelled');
         }
 
         if (!rescheduledIds.isEmpty()) {
             BookingNotificationService.sendRescheduleNotice(rescheduledIds);
             removeFromExternalCalendars(rescheduledIds);
             syncToExternalCalendars(rescheduledIds);
+            fireBookingIntegrations(rescheduledIds, 'booking.rescheduled', 'Booking_Rescheduled');
         }
 
         if (!events.isEmpty()) {
             EventBus.publish(events);
         }
+    }
+
+    private static void fireBookingIntegrations(List<Id> bookingIds, String webhookEvent, String workflowTrigger) {
+        if (bookingIds == null || bookingIds.isEmpty()) {
+            return;
+        }
+
+        for (Id bookingId : bookingIds) {
+            String payload = WebhookService.buildBookingPayload(bookingId);
+            WebhookService.fireWebhooks(webhookEvent, payload);
+        }
+
+        WorkflowEngine.executeWorkflows(workflowTrigger, bookingIds);
     }
 
     @future(callout=true)

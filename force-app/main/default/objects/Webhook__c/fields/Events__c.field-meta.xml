@@ -12,6 +12,7 @@
             <value><fullName>booking.cancelled</fullName><default>false</default><label>Booking Cancelled</label></value>
             <value><fullName>booking.rescheduled</fullName><default>false</default><label>Booking Rescheduled</label></value>
             <value><fullName>booking.confirmed</fullName><default>false</default><label>Booking Confirmed</label></value>
+            <value><fullName>booking.pending</fullName><default>false</default><label>Booking Pending</label></value>
             <value><fullName>booking.rejected</fullName><default>false</default><label>Booking Rejected</label></value>
         </valueSetDefinition>
     </valueSet>

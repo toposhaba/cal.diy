@@ -5,6 +5,7 @@
     <referenceTo>User</referenceTo>
     <relationshipLabel>Webhooks</relationshipLabel>
     <relationshipName>Webhooks</relationshipName>
-    <required>true</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
     <type>Lookup</type>
 </CustomField>

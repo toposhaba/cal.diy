@@ -1,5 +1,78 @@
 public with sharing class TeamSchedulingService {
 
+    public static Id resolveHostForBooking(Event_Type__c eventType, Datetime slotStart, Datetime slotEnd) {
+        String schedulingType = normalizeSchedulingType(eventType.Scheduling_Type__c);
+
+        if (schedulingType == 'Round_Robin') {
+            return assignRoundRobinHost(eventType.Id, slotStart, slotEnd);
+        }
+
+        if (schedulingType == 'Collective') {
+            if (!areAllHostsAvailable(eventType.Id, slotStart, slotEnd)) {
+                throw new SchedulingException('SLOT_UNAVAILABLE', 'Not all hosts are available for the selected time');
+            }
+            return getPrimaryHostId(eventType);
+        }
+
+        if (schedulingType == 'Managed') {
+            Id managedHost = getManagedHostId(eventType.Id);
+            if (managedHost == null) {
+                throw new SchedulingException('NO_HOSTS', 'No fixed host configured for this event type');
+            }
+            if (!isHostAvailableForSlot(managedHost, slotStart, slotEnd)) {
+                throw new SchedulingException('SLOT_UNAVAILABLE', 'The assigned host is not available for the selected time');
+            }
+            return managedHost;
+        }
+
+        return SchedulingOwnershipUtil.resolveHostUser(eventType.Owner_User__c, eventType.OwnerId);
+    }
+
+    public static List<Id> resolveHostsForAvailability(Event_Type__c eventType) {
+        String schedulingType = normalizeSchedulingType(eventType.Scheduling_Type__c);
+
+        if (schedulingType == 'Round_Robin' || schedulingType == 'Collective') {
+            List<Id> teamHosts = getCollectiveHosts(eventType.Id);
+            if (!teamHosts.isEmpty()) {
+                return teamHosts;
+            }
+        }
+
+        if (schedulingType == 'Managed') {
+            Id managedHost = getManagedHostId(eventType.Id);
+            if (managedHost != null) {
+                return new List<Id>{ managedHost };
+            }
+        }
+
+        return new List<Id>{
+            SchedulingOwnershipUtil.resolveHostUser(eventType.Owner_User__c, eventType.OwnerId)
+        };
+    }
+
+    public static List<AvailabilityService.TimeSlot> getRoundRobinAvailableSlots(
+        Id eventTypeId, Date startDate, Date endDate
+    ) {
+        Event_Type__c eventType = getEventType(eventTypeId);
+        List<Id> hostIds = resolveHostsForAvailability(eventType);
+        if (hostIds.isEmpty()) {
+            return new List<AvailabilityService.TimeSlot>();
+        }
+
+        Map<String, AvailabilityService.TimeSlot> slotMap = new Map<String, AvailabilityService.TimeSlot>();
+        for (Id hostId : hostIds) {
+            for (AvailabilityService.TimeSlot slot : AvailabilityService.getAvailableSlotsForHost(
+                eventTypeId, hostId, startDate, endDate
+            )) {
+                slotMap.put(buildSlotKey(slot.startTime, slot.endTime), slot);
+            }
+        }
+
+        List<AvailabilityService.TimeSlot> slots = slotMap.values();
+        slots.sort(new AvailabilityService.TimeSlotComparator());
+        return slots;
+    }
+
     public static Id assignRoundRobinHost(Id eventTypeId, Datetime slotStart, Datetime slotEnd) {
         List<Event_Type_Host__c> hosts = [
             SELECT Id, User__c, Priority__c, Weight__c, Schedule__c
@@ -19,7 +92,7 @@ public with sharing class TeamSchedulingService {
         Decimal lowestWeightedLoad = null;
 
         for (Event_Type_Host__c host : hosts) {
-            if (!isHostAvailable(host.User__c, slotStart, slotEnd)) {
+            if (!isHostAvailableForSlot(host.User__c, slotStart, slotEnd)) {
                 continue;
             }
 
@@ -60,51 +133,14 @@ public with sharing class TeamSchedulingService {
         List<Id> hostIds = getCollectiveHosts(eventTypeId);
 
         for (Id hostId : hostIds) {
-            if (!isHostAvailable(hostId, slotStart, slotEnd)) {
+            if (!isHostAvailableForSlot(hostId, slotStart, slotEnd)) {
                 return false;
             }
         }
         return true;
     }
 
-    public static List<AvailabilityService.TimeSlot> getCollectiveAvailableSlots(
-        Id eventTypeId, Date startDate, Date endDate
-    ) {
-        Event_Type__c eventType = [
-            SELECT Id, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
-                   Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
-                   Slot_Interval_Minutes__c, Schedule__c, Owner_User__c
-            FROM Event_Type__c
-            WHERE Id = :eventTypeId
-            WITH USER_MODE
-            LIMIT 1
-        ];
-
-        List<Id> hostIds = getCollectiveHosts(eventTypeId);
-        if (hostIds.isEmpty()) {
-            return new List<AvailabilityService.TimeSlot>();
-        }
-
-        List<AvailabilityService.TimeSlot> candidateSlots =
-            AvailabilityService.getAvailableSlots(eventTypeId, startDate, endDate);
-
-        List<AvailabilityService.TimeSlot> collectiveSlots = new List<AvailabilityService.TimeSlot>();
-        for (AvailabilityService.TimeSlot slot : candidateSlots) {
-            Boolean allFree = true;
-            for (Id hostId : hostIds) {
-                if (!isHostAvailable(hostId, slot.startTime, slot.endTime)) {
-                    allFree = false;
-                    break;
-                }
-            }
-            if (allFree) {
-                collectiveSlots.add(slot);
-            }
-        }
-        return collectiveSlots;
-    }
-
-    private static Boolean isHostAvailable(Id userId, Datetime slotStart, Datetime slotEnd) {
+    public static Boolean isHostAvailableForSlot(Id userId, Datetime slotStart, Datetime slotEnd) {
         List<Booking__c> conflicts = [
             SELECT Id
             FROM Booking__c
@@ -131,6 +167,134 @@ public with sharing class TeamSchedulingService {
         ];
 
         return oooEntries.isEmpty();
+    }
+
+    public static List<AvailabilityService.TimeSlot> getCollectiveAvailableSlots(
+        Id eventTypeId, Date startDate, Date endDate
+    ) {
+        Event_Type__c eventType = getEventType(eventTypeId);
+        List<Id> hostIds = resolveHostsForAvailability(eventType);
+        if (hostIds.isEmpty()) {
+            return new List<AvailabilityService.TimeSlot>();
+        }
+
+        List<AvailabilityService.TimeSlot> collectiveSlots =
+            AvailabilityService.getAvailableSlotsForHost(eventTypeId, hostIds[0], startDate, endDate);
+
+        for (Integer i = 1; i < hostIds.size(); i++) {
+            List<AvailabilityService.TimeSlot> hostSlots = AvailabilityService.getAvailableSlotsForHost(
+                eventTypeId, hostIds[i], startDate, endDate
+            );
+            collectiveSlots = intersectTimeSlots(collectiveSlots, hostSlots);
+        }
+
+        return collectiveSlots;
+    }
+
+    public static void addCollectiveHostAttendees(Id bookingId, Id eventTypeId, Id primaryHostId) {
+        List<Id> hostIds = getCollectiveHosts(eventTypeId);
+        if (hostIds.size() <= 1) {
+            return;
+        }
+
+        Set<Id> coHostIds = new Set<Id>(hostIds);
+        coHostIds.remove(primaryHostId);
+
+        Map<Id, User> coHosts = new Map<Id, User>([
+            SELECT Id, Name, Email
+            FROM User
+            WHERE Id IN :coHostIds
+            WITH USER_MODE
+        ]);
+
+        List<Attendee__c> attendees = new List<Attendee__c>();
+        for (User coHost : coHosts.values()) {
+            if (String.isNotBlank(coHost.Email)) {
+                attendees.add(new Attendee__c(
+                    Booking__c = bookingId,
+                    Name = coHost.Name,
+                    Email__c = coHost.Email
+                ));
+            }
+        }
+
+        if (!attendees.isEmpty()) {
+            insert as user attendees;
+        }
+    }
+
+    private static Event_Type__c getEventType(Id eventTypeId) {
+        List<Event_Type__c> eventTypes = [
+            SELECT Id, Owner_User__c, OwnerId, Scheduling_Type__c
+            FROM Event_Type__c
+            WHERE Id = :eventTypeId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (eventTypes.isEmpty()) {
+            throw new SchedulingException('EVENT_TYPE_NOT_FOUND', 'Event type not found');
+        }
+        return eventTypes[0];
+    }
+
+    private static Id getPrimaryHostId(Event_Type__c eventType) {
+        List<Event_Type_Host__c> fixedHosts = [
+            SELECT User__c
+            FROM Event_Type_Host__c
+            WHERE Event_Type__c = :eventType.Id AND Is_Fixed__c = true
+            WITH USER_MODE
+            ORDER BY Priority__c DESC NULLS LAST
+            LIMIT 1
+        ];
+        if (!fixedHosts.isEmpty()) {
+            return fixedHosts[0].User__c;
+        }
+
+        List<Id> hosts = getCollectiveHosts(eventType.Id);
+        if (!hosts.isEmpty()) {
+            return hosts[0];
+        }
+
+        return SchedulingOwnershipUtil.resolveHostUser(eventType.Owner_User__c, eventType.OwnerId);
+    }
+
+    private static Id getManagedHostId(Id eventTypeId) {
+        List<Event_Type_Host__c> fixedHosts = [
+            SELECT User__c
+            FROM Event_Type_Host__c
+            WHERE Event_Type__c = :eventTypeId AND Is_Fixed__c = true
+            WITH USER_MODE
+            ORDER BY Priority__c DESC NULLS LAST
+            LIMIT 1
+        ];
+        return fixedHosts.isEmpty() ? null : fixedHosts[0].User__c;
+    }
+
+    private static String normalizeSchedulingType(String schedulingType) {
+        return String.isBlank(schedulingType) ? 'Individual' : schedulingType;
+    }
+
+    private static List<AvailabilityService.TimeSlot> intersectTimeSlots(
+        List<AvailabilityService.TimeSlot> leftSlots,
+        List<AvailabilityService.TimeSlot> rightSlots
+    ) {
+        Map<String, AvailabilityService.TimeSlot> rightMap = new Map<String, AvailabilityService.TimeSlot>();
+        for (AvailabilityService.TimeSlot slot : rightSlots) {
+            rightMap.put(buildSlotKey(slot.startTime, slot.endTime), slot);
+        }
+
+        List<AvailabilityService.TimeSlot> intersection = new List<AvailabilityService.TimeSlot>();
+        for (AvailabilityService.TimeSlot slot : leftSlots) {
+            AvailabilityService.TimeSlot match = rightMap.get(buildSlotKey(slot.startTime, slot.endTime));
+            if (match != null) {
+                intersection.add(match);
+            }
+        }
+        return intersection;
+    }
+
+    private static String buildSlotKey(Datetime startTime, Datetime endTime) {
+        return String.valueOf(startTime.getTime()) + ':' + String.valueOf(endTime.getTime());
     }
 
     private static Map<Id, Integer> getRecentBookingCounts(Id eventTypeId, List<Event_Type_Host__c> hosts) {

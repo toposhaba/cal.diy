@@ -312,4 +312,110 @@ private class BookingServiceTest {
         String dayName = dt.format('EEEE');
         return dayName == 'Saturday' || dayName == 'Sunday';
     }
+
+    @IsTest
+    static void testCreateRoundRobinBooking() {
+        User host1 = SchedulingTestDataFactory.createTestUser();
+        User host2 = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(host1) {
+            Schedule__c schedule = SchedulingTestDataFactory.createSchedule(host1.Id, 'Work Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Event_Type__c eventType = SchedulingTestDataFactory.createTeamEventType(
+                host1.Id, 'Round Robin Meeting', 30, 'Round_Robin', new List<Id>{ host1.Id, host2.Id }
+            );
+            eventType.Schedule__c = schedule.Id;
+            update eventType;
+
+            Date futureDate = Date.today().addDays(14);
+            while (isWeekend(futureDate)) {
+                futureDate = futureDate.addDays(1);
+            }
+            Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(10, 0, 0, 0));
+
+            BookingService.BookingRequest request = new BookingService.BookingRequest();
+            request.eventTypeId = eventType.Id;
+            request.startDateTime = startDt;
+            request.bookerEmail = 'rr@example.com';
+            request.bookerName = 'Round Robin Booker';
+
+            Test.startTest();
+            Booking__c booking = BookingService.createBooking(request);
+            Test.stopTest();
+
+            System.assertNotEquals(null, booking.Host__c);
+            System.assert(booking.Host__c == host1.Id || booking.Host__c == host2.Id);
+        }
+    }
+
+    @IsTest
+    static void testCreateCollectiveBookingAddsCoHosts() {
+        User host1 = SchedulingTestDataFactory.createTestUser();
+        User host2 = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(host1) {
+            Schedule__c schedule1 = SchedulingTestDataFactory.createSchedule(host1.Id, 'Host 1 Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule1.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Schedule__c schedule2 = SchedulingTestDataFactory.createSchedule(host2.Id, 'Host 2 Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule2.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Event_Type__c eventType = SchedulingTestDataFactory.createTeamEventType(
+                host1.Id, 'Collective Meeting', 30, 'Collective', new List<Id>{ host1.Id, host2.Id }
+            );
+
+            Date futureDate = Date.today().addDays(14);
+            while (isWeekend(futureDate)) {
+                futureDate = futureDate.addDays(1);
+            }
+            Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(11, 0, 0, 0));
+
+            BookingService.BookingRequest request = new BookingService.BookingRequest();
+            request.eventTypeId = eventType.Id;
+            request.startDateTime = startDt;
+            request.bookerEmail = 'collective@example.com';
+            request.bookerName = 'Collective Booker';
+
+            Test.startTest();
+            Booking__c booking = BookingService.createBooking(request);
+            Test.stopTest();
+
+            List<Attendee__c> attendees = [SELECT Id FROM Attendee__c WHERE Booking__c = :booking.Id];
+            System.assertEquals(1, attendees.size());
+        }
+    }
+
+    @IsTest
+    static void testCreateManagedBookingUsesFixedHost() {
+        User host1 = SchedulingTestDataFactory.createTestUser();
+        User host2 = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(host1) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createTeamEventType(
+                host1.Id, 'Managed Meeting', 30, 'Managed', new List<Id>{ host2.Id }
+            );
+
+            BookingService.BookingRequest request = new BookingService.BookingRequest();
+            request.eventTypeId = eventType.Id;
+            request.startDateTime = Datetime.now().addDays(7);
+            request.bookerEmail = 'managed@example.com';
+            request.bookerName = 'Managed Booker';
+
+            Test.startTest();
+            Booking__c booking = BookingService.createBooking(request);
+            Test.stopTest();
+
+            System.assertEquals(host2.Id, booking.Host__c);
+        }
+    }
 }

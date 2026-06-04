@@ -118,4 +118,68 @@ private class TeamSchedulingServiceTest {
             System.assertEquals(false, available, 'Should be blocked by OOO');
         }
     }
+
+    @IsTest
+    static void testResolveHostForManagedEvent() {
+        User host1 = SchedulingTestDataFactory.createTestUser();
+        User host2 = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(host1) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createTeamEventType(
+                host1.Id, 'Managed Host', 30, 'Managed', new List<Id>{ host2.Id }
+            );
+            Datetime slotStart = Datetime.now().addDays(5);
+
+            Test.startTest();
+            Id assignedHost = TeamSchedulingService.resolveHostForBooking(
+                eventType, slotStart, slotStart.addMinutes(30)
+            );
+            Test.stopTest();
+
+            System.assertEquals(host2.Id, assignedHost);
+        }
+    }
+
+    @IsTest
+    static void testRoundRobinAvailableSlotsUnion() {
+        User host1 = SchedulingTestDataFactory.createTestUser();
+        User host2 = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(host1) {
+            Schedule__c schedule1 = SchedulingTestDataFactory.createSchedule(host1.Id, 'Host 1 Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule1.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(12, 0, 0, 0)
+            );
+
+            Schedule__c schedule2 = SchedulingTestDataFactory.createSchedule(host2.Id, 'Host 2 Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule2.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(13, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Event_Type__c eventType = SchedulingTestDataFactory.createTeamEventType(
+                host1.Id, 'Union Slots', 30, 'Round_Robin', new List<Id>{ host1.Id, host2.Id }
+            );
+
+            Date startDate = Date.today().addDays(14);
+            while (isWeekend(startDate)) {
+                startDate = startDate.addDays(1);
+            }
+
+            Test.startTest();
+            List<AvailabilityService.TimeSlot> slots = TeamSchedulingService.getRoundRobinAvailableSlots(
+                eventType.Id, startDate, startDate
+            );
+            Test.stopTest();
+
+            System.assert(slots.size() > 0, 'Round robin should expose union of host availability');
+        }
+    }
+
+    private static Boolean isWeekend(Date d) {
+        Datetime dt = Datetime.newInstance(d, Time.newInstance(12, 0, 0, 0));
+        String dayName = dt.format('EEEE');
+        return dayName == 'Saturday' || dayName == 'Sunday';
+    }
 }

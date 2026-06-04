@@ -5,6 +5,7 @@
     <referenceTo>User</referenceTo>
     <relationshipLabel>Team Memberships</relationshipLabel>
     <relationshipName>Team_Memberships</relationshipName>
-    <required>true</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
     <type>Lookup</type>
 </CustomField>

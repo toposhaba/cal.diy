@@ -6,7 +6,8 @@ public with sharing class BookingService {
         List<Event_Type__c> eventTypes = [
             SELECT Id, Name, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
                    Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
-                   Owner_User__c, OwnerId, Location__c, Requires_Confirmation__c, Is_Active__c
+                   Owner_User__c, OwnerId, Location__c, Requires_Confirmation__c,
+                   Is_Active__c, Scheduling_Type__c
             FROM Event_Type__c
             WHERE Id = :request.eventTypeId AND Is_Active__c = true
             WITH USER_MODE
@@ -18,9 +19,9 @@ public with sharing class BookingService {
         }
         Event_Type__c eventType = eventTypes[0];
 
-        Id hostUserId = SchedulingOwnershipUtil.resolveHostUser(eventType.Owner_User__c, eventType.OwnerId);
         Datetime slotEnd = request.startDateTime.addMinutes((Integer)eventType.Duration_Minutes__c);
-        validateSlotAvailability(hostUserId, eventType, request.startDateTime, slotEnd, null);
+        Id hostUserId = TeamSchedulingService.resolveHostForBooking(eventType, request.startDateTime, slotEnd);
+        validateSlotAvailability(eventType, hostUserId, request.startDateTime, slotEnd, null);
 
         String status = eventType.Requires_Confirmation__c ? 'Pending' : 'Accepted';
 
@@ -41,6 +42,10 @@ public with sharing class BookingService {
 
         if (request.attendeeEmails != null && !request.attendeeEmails.isEmpty()) {
             createAttendees(booking.Id, request.attendeeEmails, request.bookerName);
+        }
+
+        if (eventType.Scheduling_Type__c == 'Collective') {
+            TeamSchedulingService.addCollectiveHostAttendees(booking.Id, eventType.Id, hostUserId);
         }
 
         return booking;
@@ -98,7 +103,9 @@ public with sharing class BookingService {
                    Event_Type__r.Min_Booking_Notice_Minutes__c,
                    Event_Type__r.Buffer_Before_Minutes__c,
                    Event_Type__r.Buffer_After_Minutes__c,
-                   Event_Type__r.Owner_User__c
+                   Event_Type__r.Owner_User__c,
+                   Event_Type__r.OwnerId,
+                   Event_Type__r.Scheduling_Type__c
             FROM Booking__c
             WHERE Id = :bookingId AND Status__c IN ('Accepted', 'Pending')
             WITH USER_MODE
@@ -116,12 +123,20 @@ public with sharing class BookingService {
             Min_Booking_Notice_Minutes__c = existingBooking.Event_Type__r.Min_Booking_Notice_Minutes__c,
             Buffer_Before_Minutes__c = existingBooking.Event_Type__r.Buffer_Before_Minutes__c,
             Buffer_After_Minutes__c = existingBooking.Event_Type__r.Buffer_After_Minutes__c,
-            Owner_User__c = existingBooking.Event_Type__r.Owner_User__c
+            Owner_User__c = existingBooking.Event_Type__r.Owner_User__c,
+            OwnerId = existingBooking.Event_Type__r.OwnerId,
+            Scheduling_Type__c = existingBooking.Event_Type__r.Scheduling_Type__c
         );
 
         Datetime newEnd = newStartDateTime.addMinutes((Integer)eventType.Duration_Minutes__c);
-        validateSlotAvailability(existingBooking.Host__c, eventType, newStartDateTime, newEnd, bookingId);
+        Id hostUserId = existingBooking.Host__c;
+        if (eventType.Scheduling_Type__c == 'Round_Robin') {
+            hostUserId = TeamSchedulingService.resolveHostForBooking(eventType, newStartDateTime, newEnd);
+        }
 
+        validateSlotAvailability(eventType, hostUserId, newStartDateTime, newEnd, bookingId);
+
+        existingBooking.Host__c = hostUserId;
         existingBooking.Start_DateTime__c = newStartDateTime;
         existingBooking.End_DateTime__c = newEnd;
         update as user existingBooking;
@@ -162,13 +177,26 @@ public with sharing class BookingService {
         }
     }
 
-    private static void validateSlotAvailability(Id hostUserId, Event_Type__c eventType, Datetime slotStart, Datetime slotEnd, Id excludeBookingId) {
+    private static void validateSlotAvailability(
+        Event_Type__c eventType, Id hostUserId, Datetime slotStart, Datetime slotEnd, Id excludeBookingId
+    ) {
         Integer minNotice = eventType.Min_Booking_Notice_Minutes__c != null
             ? (Integer)eventType.Min_Booking_Notice_Minutes__c : 120;
 
         if (slotStart < Datetime.now().addMinutes(minNotice)) {
             throw new SchedulingException('INSUFFICIENT_NOTICE',
                 'Booking must be made at least ' + minNotice + ' minutes in advance');
+        }
+
+        String schedulingType = String.isBlank(eventType.Scheduling_Type__c)
+            ? 'Individual' : eventType.Scheduling_Type__c;
+
+        if (schedulingType == 'Collective') {
+            if (!TeamSchedulingService.areAllHostsAvailable(eventType.Id, slotStart, slotEnd)) {
+                throw new SchedulingException('SLOT_UNAVAILABLE', 'Not all hosts are available for the selected time');
+            }
+        } else if (!TeamSchedulingService.isHostAvailableForSlot(hostUserId, slotStart, slotEnd)) {
+            throw new SchedulingException('SLOT_UNAVAILABLE', 'The selected time slot is no longer available');
         }
 
         Integer bufferBefore = eventType.Buffer_Before_Minutes__c != null
@@ -179,34 +207,40 @@ public with sharing class BookingService {
         Datetime checkStart = slotStart.addMinutes(-bufferBefore);
         Datetime checkEnd = slotEnd.addMinutes(bufferAfter);
 
-        List<Booking__c> conflicts;
-        if (excludeBookingId != null) {
-            conflicts = [
-                SELECT Id
-                FROM Booking__c
-                WHERE Host__c = :hostUserId
-                    AND Id != :excludeBookingId
-                    AND Status__c IN ('Accepted', 'Pending')
-                    AND Start_DateTime__c < :checkEnd
-                    AND End_DateTime__c > :checkStart
-                WITH USER_MODE
-                LIMIT 1
-            ];
-        } else {
-            conflicts = [
-                SELECT Id
-                FROM Booking__c
-                WHERE Host__c = :hostUserId
-                    AND Status__c IN ('Accepted', 'Pending')
-                    AND Start_DateTime__c < :checkEnd
-                    AND End_DateTime__c > :checkStart
-                WITH USER_MODE
-                LIMIT 1
-            ];
-        }
+        List<Id> hostsToCheck = schedulingType == 'Collective'
+            ? TeamSchedulingService.getCollectiveHosts(eventType.Id)
+            : new List<Id>{ hostUserId };
 
-        if (!conflicts.isEmpty()) {
-            throw new SchedulingException('SLOT_UNAVAILABLE', 'The selected time slot is no longer available');
+        for (Id checkHostId : hostsToCheck) {
+            List<Booking__c> conflicts;
+            if (excludeBookingId != null) {
+                conflicts = [
+                    SELECT Id
+                    FROM Booking__c
+                    WHERE Host__c = :checkHostId
+                        AND Id != :excludeBookingId
+                        AND Status__c IN ('Accepted', 'Pending')
+                        AND Start_DateTime__c < :checkEnd
+                        AND End_DateTime__c > :checkStart
+                    WITH USER_MODE
+                    LIMIT 1
+                ];
+            } else {
+                conflicts = [
+                    SELECT Id
+                    FROM Booking__c
+                    WHERE Host__c = :checkHostId
+                        AND Status__c IN ('Accepted', 'Pending')
+                        AND Start_DateTime__c < :checkEnd
+                        AND End_DateTime__c > :checkStart
+                    WITH USER_MODE
+                    LIMIT 1
+                ];
+            }
+
+            if (!conflicts.isEmpty()) {
+                throw new SchedulingException('SLOT_UNAVAILABLE', 'The selected time slot is no longer available');
+            }
         }
     }
 
