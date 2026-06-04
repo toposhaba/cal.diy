@@ -85,7 +85,9 @@ public with sharing class SeatedBookingService {
         return maxSeats - reservedSeats;
     }
 
-    public static Booking__c findOrCreateSeatedBooking(Id eventTypeId, Datetime slotStart) {
+    public static Booking__c findOrCreateSeatedBooking(
+        Id eventTypeId, Id hostUserId, Datetime slotStart, String bookerName, String bookerEmail
+    ) {
         Event_Type__c eventType = [
             SELECT Id, Name, Duration_Minutes__c, Seats_Per_Slot__c, Owner_User__c, Location__c
             FROM Event_Type__c
@@ -118,17 +120,92 @@ public with sharing class SeatedBookingService {
         Booking__c newBooking = new Booking__c(
             UID__c = generateUID(),
             Event_Type__c = eventType.Id,
-            Host__c = eventType.Owner_User__c,
-            Title__c = eventType.Name + ' (Group)',
+            Host__c = hostUserId,
+            Title__c = eventType.Name + ' with ' + String.escapeSingleQuotes(bookerName),
             Start_DateTime__c = slotStart,
             End_DateTime__c = slotEnd,
             Status__c = 'Accepted',
             Location__c = eventType.Location__c,
-            Booker_Email__c = 'group@placeholder.local',
-            Booker_Name__c = 'Group Booking'
+            Booker_Email__c = bookerEmail,
+            Booker_Name__c = bookerName
         );
         insert as user newBooking;
         return newBooking;
+    }
+
+    public static Integer getAvailableSeatsForSlot(Id eventTypeId, Datetime slotStart, Datetime slotEnd) {
+        List<Event_Type__c> eventTypes = [
+            SELECT Seats_Per_Slot__c
+            FROM Event_Type__c
+            WHERE Id = :eventTypeId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+
+        if (eventTypes.isEmpty()) {
+            return 0;
+        }
+
+        Integer maxSeats = eventTypes[0].Seats_Per_Slot__c != null
+            ? (Integer) eventTypes[0].Seats_Per_Slot__c : 1;
+
+        if (maxSeats <= 1) {
+            return maxSeats;
+        }
+
+        List<Booking__c> existingBookings = [
+            SELECT Id
+            FROM Booking__c
+            WHERE Event_Type__c = :eventTypeId
+                AND Start_DateTime__c = :slotStart
+                AND End_DateTime__c = :slotEnd
+                AND Status__c = 'Accepted'
+            WITH USER_MODE
+            LIMIT 1
+        ];
+
+        if (existingBookings.isEmpty()) {
+            return maxSeats;
+        }
+
+        return getAvailableSeats(existingBookings[0].Id);
+    }
+
+    public static List<AvailabilityService.TimeSlot> enrichSlotsWithSeatAvailability(
+        Id eventTypeId, List<AvailabilityService.TimeSlot> slots
+    ) {
+        List<Event_Type__c> eventTypes = [
+            SELECT Seats_Per_Slot__c
+            FROM Event_Type__c
+            WHERE Id = :eventTypeId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+
+        if (eventTypes.isEmpty()) {
+            return slots;
+        }
+
+        Integer maxSeats = eventTypes[0].Seats_Per_Slot__c != null
+            ? (Integer) eventTypes[0].Seats_Per_Slot__c : 1;
+
+        if (maxSeats <= 1) {
+            return slots;
+        }
+
+        List<AvailabilityService.TimeSlot> availableSlots = new List<AvailabilityService.TimeSlot>();
+        for (AvailabilityService.TimeSlot slot : slots) {
+            Integer remaining = getAvailableSeatsForSlot(eventTypeId, slot.startTime, slot.endTime);
+            slot.availableSeats = remaining;
+            if (remaining > 0) {
+                availableSlots.add(slot);
+            }
+        }
+        return availableSlots;
+    }
+
+    public static Boolean isSeatedEvent(Event_Type__c eventType) {
+        return eventType.Seats_Per_Slot__c != null && eventType.Seats_Per_Slot__c > 1;
     }
 
     private static String generateUID() {

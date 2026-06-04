@@ -11,6 +11,7 @@ public with sharing class BookingTriggerHandler {
     private static void processNewBookings(List<Booking__c> newBookings) {
         List<Id> confirmedIds = new List<Id>();
         List<Id> pendingIds = new List<Id>();
+        List<Id> pendingPaymentIds = new List<Id>();
         List<Id> createdIds = new List<Id>();
         List<Booking_Event__e> events = new List<Booking_Event__e>();
 
@@ -19,8 +20,10 @@ public with sharing class BookingTriggerHandler {
 
             if (booking.Status__c == 'Accepted') {
                 confirmedIds.add(booking.Id);
-            } else if (booking.Status__c == 'Pending' || booking.Status__c == 'Pending_Payment') {
+            } else if (booking.Status__c == 'Pending') {
                 pendingIds.add(booking.Id);
+            } else if (booking.Status__c == 'Pending_Payment') {
+                pendingPaymentIds.add(booking.Id);
             }
 
             events.add(new Booking_Event__e(
@@ -37,6 +40,10 @@ public with sharing class BookingTriggerHandler {
 
         if (!pendingIds.isEmpty()) {
             BookingNotificationService.sendPendingApprovalNotice(pendingIds);
+        }
+
+        if (!pendingPaymentIds.isEmpty()) {
+            BookingNotificationService.sendPendingPaymentNotice(pendingPaymentIds);
         }
 
         fireBookingIntegrations(createdIds, 'booking.created', 'New_Booking');
@@ -135,6 +142,7 @@ public with sharing class BookingTriggerHandler {
     private static void syncToExternalCalendars(List<Id> bookingIds) {
         for (Id bookingId : bookingIds) {
             try {
+                BookingEnrichmentService.ensureMeetingLink(bookingId);
                 CalendarIntegrationService.createExternalEvent(bookingId);
             } catch (Exception e) {
                 System.debug(LoggingLevel.ERROR, 'Calendar sync failed for booking ' + bookingId + ': ' + e.getMessage());

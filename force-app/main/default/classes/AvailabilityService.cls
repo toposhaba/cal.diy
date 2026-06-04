@@ -52,17 +52,26 @@ public with sharing class AvailabilityService {
             ? 'Individual' : eventType.Scheduling_Type__c;
 
         if (schedulingType == 'Collective') {
-            return TeamSchedulingService.getCollectiveAvailableSlots(eventTypeId, startDate, endDate);
+            return SeatedBookingService.enrichSlotsWithSeatAvailability(
+                eventTypeId,
+                TeamSchedulingService.getCollectiveAvailableSlots(eventTypeId, startDate, endDate)
+            );
         }
         if (schedulingType == 'Round_Robin') {
-            return TeamSchedulingService.getRoundRobinAvailableSlots(eventTypeId, startDate, endDate);
+            return SeatedBookingService.enrichSlotsWithSeatAvailability(
+                eventTypeId,
+                TeamSchedulingService.getRoundRobinAvailableSlots(eventTypeId, startDate, endDate)
+            );
         }
 
         List<Id> hosts = TeamSchedulingService.resolveHostsForAvailability(eventType);
         if (hosts.isEmpty()) {
             return new List<TimeSlot>();
         }
-        return getAvailableSlotsForHost(eventTypeId, hosts[0], startDate, endDate);
+        return SeatedBookingService.enrichSlotsWithSeatAvailability(
+            eventTypeId,
+            getAvailableSlotsForHost(eventTypeId, hosts[0], startDate, endDate)
+        );
     }
 
     public static List<TimeSlot> getAvailableSlotsForHost(Id eventTypeId, Id hostUserId, Date startDate, Date endDate) {
@@ -70,7 +79,7 @@ public with sharing class AvailabilityService {
             SELECT Id, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
                    Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
                    Slot_Interval_Minutes__c, Booking_Window_Days__c,
-                   Owner_User__c, OwnerId, Schedule__c
+                   Owner_User__c, OwnerId, Schedule__c, Seats_Per_Slot__c
             FROM Event_Type__c
             WHERE Id = :eventTypeId
             WITH USER_MODE
@@ -109,7 +118,7 @@ public with sharing class AvailabilityService {
         ];
 
         List<Booking__c> existingBookings = [
-            SELECT Id, Start_DateTime__c, End_DateTime__c
+            SELECT Id, Start_DateTime__c, End_DateTime__c, Event_Type__c, Event_Type__r.Seats_Per_Slot__c
             FROM Booking__c
             WHERE Host__c = :hostUserId
                 AND Status__c IN ('Accepted', 'Pending')
@@ -189,7 +198,7 @@ public with sharing class AvailabilityService {
                     Datetime slotEnd = slotStart.addMinutes(durationMinutes);
 
                     if (slotStart >= minimumStart &&
-                        !hasConflict(slotStart, slotEnd, bufferBefore, bufferAfter, existingBookings) &&
+                        !hasConflict(slotStart, slotEnd, bufferBefore, bufferAfter, existingBookings, eventType) &&
                         !hasExternalConflict(slotStart, slotEnd, externalBusy)) {
                         slots.add(new TimeSlot(slotStart, slotEnd));
                     }
@@ -234,12 +243,17 @@ public with sharing class AvailabilityService {
     private static Boolean hasConflict(
         Datetime slotStart, Datetime slotEnd,
         Integer bufferBefore, Integer bufferAfter,
-        List<Booking__c> existingBookings
+        List<Booking__c> existingBookings,
+        Event_Type__c eventType
     ) {
         Datetime bufferedStart = slotStart.addMinutes(-bufferBefore);
         Datetime bufferedEnd = slotEnd.addMinutes(bufferAfter);
 
         for (Booking__c booking : existingBookings) {
+            if (eventType.Seats_Per_Slot__c != null && eventType.Seats_Per_Slot__c > 1
+                && booking.Event_Type__c == eventType.Id) {
+                continue;
+            }
             if (bufferedStart < booking.End_DateTime__c && bufferedEnd > booking.Start_DateTime__c) {
                 return true;
             }
@@ -255,6 +269,7 @@ public with sharing class AvailabilityService {
     public class TimeSlot {
         @AuraEnabled public Datetime startTime { get; set; }
         @AuraEnabled public Datetime endTime { get; set; }
+        @AuraEnabled public Integer availableSeats { get; set; }
 
         public TimeSlot(Datetime startTime, Datetime endTime) {
             this.startTime = startTime;

@@ -418,4 +418,112 @@ private class BookingServiceTest {
             System.assertEquals(host2.Id, booking.Host__c);
         }
     }
+
+    @IsTest
+    static void testCreateSeatedBooking() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Schedule__c schedule = SchedulingTestDataFactory.createSchedule(testUser.Id, 'Work Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventTypeWithSchedule(
+                testUser.Id, schedule.Id, 'Group Class', 60
+            );
+            eventType.Seats_Per_Slot__c = 5;
+            update eventType;
+
+            Date futureDate = Date.today().addDays(14);
+            while (isWeekend(futureDate)) {
+                futureDate = futureDate.addDays(1);
+            }
+            Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(10, 0, 0, 0));
+
+            BookingService.BookingRequest request = new BookingService.BookingRequest();
+            request.eventTypeId = eventType.Id;
+            request.startDateTime = startDt;
+            request.bookerEmail = 'student@example.com';
+            request.bookerName = 'Student One';
+
+            Test.startTest();
+            Booking__c booking = BookingService.createBooking(request);
+            Test.stopTest();
+
+            List<Booking_Seat__c> seats = [SELECT Id FROM Booking_Seat__c WHERE Booking__c = :booking.Id];
+            System.assertEquals(1, seats.size());
+            System.assertEquals('Accepted', booking.Status__c);
+        }
+    }
+
+    @IsTest
+    static void testCreatePaidBooking() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Schedule__c schedule = SchedulingTestDataFactory.createSchedule(testUser.Id, 'Work Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventTypeWithSchedule(
+                testUser.Id, schedule.Id, 'Paid Consult', 30
+            );
+            eventType.Price__c = 75;
+            update eventType;
+
+            Date futureDate = Date.today().addDays(14);
+            while (isWeekend(futureDate)) {
+                futureDate = futureDate.addDays(1);
+            }
+            Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(11, 0, 0, 0));
+
+            BookingService.BookingRequest request = new BookingService.BookingRequest();
+            request.eventTypeId = eventType.Id;
+            request.startDateTime = startDt;
+            request.bookerEmail = 'paid@example.com';
+            request.bookerName = 'Paid Client';
+
+            Test.startTest();
+            Booking__c booking = BookingService.createBooking(request);
+            Test.stopTest();
+
+            System.assertEquals('Pending_Payment', booking.Status__c);
+        }
+    }
+
+    @IsTest
+    static void testCompletePayment() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Paid Event', 30);
+            Booking__c booking = SchedulingTestDataFactory.createBooking(
+                eventType.Id,
+                testUser.Id,
+                Datetime.now().addDays(7),
+                Datetime.now().addDays(7).addMinutes(30)
+            );
+            booking.Status__c = 'Pending_Payment';
+            update booking;
+
+            insert new Payment__c(
+                Booking__c = booking.Id,
+                Amount__c = 50,
+                Currency_Code__c = 'USD',
+                Status__c = 'Pending',
+                External_Payment_Id__c = 'pi_complete_123',
+                Provider__c = 'Stripe'
+            );
+
+            Test.startTest();
+            Booking__c confirmed = BookingService.completePayment(booking.Id);
+            Test.stopTest();
+
+            System.assertEquals('Accepted', confirmed.Status__c);
+        }
+    }
 }

@@ -226,11 +226,21 @@ export default class CalendarBooking extends LightningElement {
         return this.confirmedBooking && this.confirmedBooking.Status__c === 'Pending';
     }
 
+    get isPendingPayment() {
+        return this.confirmedBooking && this.confirmedBooking.Status__c === 'Pending_Payment';
+    }
+
     get confirmationHeading() {
+        if (this.isPendingPayment) {
+            return 'Payment Required';
+        }
         return this.isPendingBooking ? 'Booking Pending Approval' : 'Booking Confirmed!';
     }
 
     get confirmationIcon() {
+        if (this.isPendingPayment) {
+            return 'utility:money';
+        }
         return this.isPendingBooking ? 'action:submit_for_approval' : 'action:approval';
     }
 
@@ -247,11 +257,18 @@ export default class CalendarBooking extends LightningElement {
     }
 
     get formattedSlots() {
-        return this.availableSlots.map((slot, index) => ({
-            ...slot,
-            index,
-            formattedTime: this.formatTime(slot.startTime)
-        }));
+        return this.availableSlots.map((slot, index) => {
+            const formattedTime = this.formatTime(slot.startTime);
+            const slotLabel = slot.availableSeats > 1
+                ? `${formattedTime} (${slot.availableSeats} seats)`
+                : formattedTime;
+            return {
+                ...slot,
+                index,
+                formattedTime,
+                slotLabel
+            };
+        });
     }
 
     get minDate() {

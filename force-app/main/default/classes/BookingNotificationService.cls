@@ -92,6 +92,28 @@ public with sharing class BookingNotificationService {
         }
     }
 
+    public static void sendPendingPaymentNotice(List<Id> bookingIds) {
+        List<Booking__c> bookings = [
+            SELECT Id, UID__c, Title__c, Start_DateTime__c, End_DateTime__c,
+                   Booker_Email__c, Booker_Name__c,
+                   Host__c, Host__r.Name, Host__r.Email,
+                   Event_Type__r.Name, Event_Type__r.Price__c
+            FROM Booking__c
+            WHERE Id IN :bookingIds AND Status__c = 'Pending_Payment'
+            WITH USER_MODE
+        ];
+
+        List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
+
+        for (Booking__c booking : bookings) {
+            emails.add(buildPendingPaymentEmail(booking));
+        }
+
+        if (!emails.isEmpty() && !Test.isRunningTest()) {
+            Messaging.sendEmail(emails, false);
+        }
+    }
+
     private static Messaging.SingleEmailMessage buildBookerConfirmationEmail(Booking__c booking) {
         Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
         email.setToAddresses(new List<String>{ booking.Booker_Email__c });
@@ -108,6 +130,7 @@ public with sharing class BookingNotificationService {
             '<p style="color: #666; font-size: 12px;">Need to make changes? Use your booking reference to reschedule or cancel.</p>'
         );
         email.setSaveAsActivity(false);
+        attachIcsIfAvailable(email, booking.Id);
         return email;
     }
 
@@ -125,6 +148,7 @@ public with sharing class BookingNotificationService {
             (String.isNotBlank(booking.Location__c) ? '<p><strong>Where:</strong> ' + booking.Location__c.escapeHtml4() + '</p>' : '')
         );
         email.setSaveAsActivity(false);
+        attachIcsIfAvailable(email, booking.Id);
         return email;
     }
 
@@ -156,6 +180,7 @@ public with sharing class BookingNotificationService {
             (String.isNotBlank(booking.Location__c) ? '<p><strong>Where:</strong> ' + booking.Location__c.escapeHtml4() + '</p>' : '')
         );
         email.setSaveAsActivity(false);
+        attachIcsIfAvailable(email, booking.Id);
         return email;
     }
 
@@ -192,5 +217,29 @@ public with sharing class BookingNotificationService {
         );
         email.setSaveAsActivity(false);
         return email;
+    }
+
+    private static Messaging.SingleEmailMessage buildPendingPaymentEmail(Booking__c booking) {
+        Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
+        email.setToAddresses(new List<String>{ booking.Booker_Email__c });
+        email.setSubject('Payment Required: ' + booking.Event_Type__r.Name);
+        email.setHtmlBody(
+            '<h2>Complete Your Payment</h2>' +
+            '<p>Your booking is reserved pending payment.</p>' +
+            '<p><strong>Meeting:</strong> ' + String.valueOf(booking.Event_Type__r.Name).escapeHtml4() + '</p>' +
+            '<p><strong>When:</strong> ' + booking.Start_DateTime__c.format('EEEE, MMMM d, yyyy h:mm a') +
+            ' - ' + booking.End_DateTime__c.format('h:mm a') + '</p>' +
+            '<p><strong>Amount:</strong> $' + booking.Event_Type__r.Price__c + '</p>' +
+            '<p><strong>Reference:</strong> ' + booking.UID__c + '</p>'
+        );
+        email.setSaveAsActivity(false);
+        return email;
+    }
+
+    private static void attachIcsIfAvailable(Messaging.SingleEmailMessage email, Id bookingId) {
+        Messaging.EmailFileAttachment attachment = IcsGenerator.createIcsAttachment(bookingId);
+        if (attachment != null) {
+            email.setFileAttachments(new List<Messaging.EmailFileAttachment>{ attachment });
+        }
     }
 }

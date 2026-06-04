@@ -114,11 +114,36 @@ private class SeatedBookingServiceTest {
             Datetime start = Datetime.now().addDays(14);
 
             Test.startTest();
-            Booking__c booking = SeatedBookingService.findOrCreateSeatedBooking(eventType.Id, start);
-            Booking__c same = SeatedBookingService.findOrCreateSeatedBooking(eventType.Id, start);
+            Booking__c booking = SeatedBookingService.findOrCreateSeatedBooking(
+                eventType.Id, testUser.Id, start, 'First Booker', 'first@example.com'
+            );
+            Booking__c same = SeatedBookingService.findOrCreateSeatedBooking(
+                eventType.Id, testUser.Id, start, 'Second Booker', 'second@example.com'
+            );
             Test.stopTest();
 
             System.assertEquals(booking.Id, same.Id, 'Should reuse existing booking for same slot');
+            System.assertEquals('first@example.com', booking.Booker_Email__c);
+        }
+    }
+
+    @IsTest
+    static void testGetAvailableSeatsForSlot() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Slot Seats', 60);
+            eventType.Seats_Per_Slot__c = 4;
+            update eventType;
+
+            Datetime start = Datetime.now().addDays(14);
+            Datetime slotEnd = start.addMinutes(60);
+
+            Test.startTest();
+            Integer emptySlot = SeatedBookingService.getAvailableSeatsForSlot(eventType.Id, start, slotEnd);
+            Test.stopTest();
+
+            System.assertEquals(4, emptySlot);
         }
     }
 }

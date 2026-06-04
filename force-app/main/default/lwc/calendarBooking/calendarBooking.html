@@ -61,7 +61,7 @@
                         <template for:each={formattedSlots} for:item="slot">
                             <div key={slot.index} class="slds-col slds-size_1-of-3 slds-m-bottom_xx-small">
                                 <lightning-button
-                                    label={slot.formattedTime}
+                                    label={slot.slotLabel}
                                     data-index={slot.index}
                                     onclick={handleSlotSelect}
                                     variant="neutral"

@@ -317,6 +317,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Payment__c.External_Payment_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Event_Type_Host__c.Is_Fixed__c</field>
         <readable>true</readable>
     </fieldPermissions>
