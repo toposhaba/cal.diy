@@ -15,7 +15,7 @@ public with sharing class SchedulingJobService {
 
     public static Id scheduleWorkflowReminders() {
         abortJob(WORKFLOW_REMINDER_JOB);
-        return System.schedule(WORKFLOW_REMINDER_JOB, '0 */15 * * * ?', new WorkflowReminderSchedulable());
+        return System.schedule(WORKFLOW_REMINDER_JOB, '0 0 * * * ?', new WorkflowReminderSchedulable());
     }
 
     public static void abortJob(String jobName) {
