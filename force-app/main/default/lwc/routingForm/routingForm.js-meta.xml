@@ -13,6 +13,11 @@
     <targetConfigs>
         <targetConfig targets="lightning__AppPage,lightning__RecordPage,lightning__HomePage">
             <property name="routingFormId" type="String" label="Routing Form ID" description="Optional. Pre-select a routing form." />
+            <property name="hostUserId" type="String" label="Host User ID" description="Host whose routing forms and event types to use." />
+        </targetConfig>
+        <targetConfig targets="lightningCommunity__Default">
+            <property name="routingFormId" type="String" label="Routing Form ID" description="Optional. Pre-select a routing form." />
+            <property name="hostUserId" type="String" label="Host User ID" description="Salesforce User Id of the host being booked." required="true" />
         </targetConfig>
     </targetConfigs>
 </LightningComponentBundle>

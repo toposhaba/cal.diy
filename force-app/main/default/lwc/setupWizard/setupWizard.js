@@ -4,6 +4,7 @@ import getOnboardingStatus from '@salesforce/apex/SchedulingController.getOnboar
 import createSchedule from '@salesforce/apex/SchedulingController.createSchedule';
 import addAvailability from '@salesforce/apex/SchedulingController.addAvailability';
 import createEventType from '@salesforce/apex/SchedulingController.createEventType';
+import scheduleBackgroundJobs from '@salesforce/apex/SchedulingController.scheduleBackgroundJobs';
 import createConnection from '@salesforce/apex/CalendarConnectionController.createConnection';
 import getNamedCredentialAuthUrl from '@salesforce/apex/CalendarConnectionController.getNamedCredentialAuthUrl';
 import verifyConnection from '@salesforce/apex/CalendarConnectionController.verifyConnection';
@@ -335,6 +336,7 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
                 durationMinutes: this.eventTypeDuration,
                 description: this.eventTypeDescription
             });
+            await scheduleBackgroundJobs();
             this.onboardingStatus.hasSchedule = true;
             this.onboardingStatus.hasAvailability = true;
             this.onboardingStatus.hasEventType = true;
@@ -364,6 +366,27 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
 
     handleRestartWizard() {
         this.currentStep = 'timezone';
+    }
+
+    handleOpenBookingPage() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__navItemPage',
+            attributes: { apiName: 'Calendar_Booking' }
+        });
+    }
+
+    handleOpenScheduleManager() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__navItemPage',
+            attributes: { apiName: 'Schedule_Manager' }
+        });
+    }
+
+    handleOpenBookingManager() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__navItemPage',
+            attributes: { apiName: 'Booking_Manager' }
+        });
     }
 
     extractError(err) {

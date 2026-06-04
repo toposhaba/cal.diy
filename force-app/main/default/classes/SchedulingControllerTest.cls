@@ -348,7 +348,7 @@ private class SchedulingControllerTest {
 
             Test.startTest();
             RoutingFormService.RoutingResult result = SchedulingController.evaluateRoutingForm(form.Id, responses);
-            List<Routing_Form__c> forms = SchedulingController.getActiveRoutingForms();
+            List<Routing_Form__c> forms = SchedulingController.getActiveRoutingForms(testUser.Id);
             List<RoutingFormService.FormFieldInfo> fields = SchedulingController.getRoutingFormFields(form.Id);
             Test.stopTest();
 
@@ -386,6 +386,42 @@ private class SchedulingControllerTest {
             Test.stopTest();
 
             System.assertEquals(2, bookings.size());
+        }
+    }
+
+    @IsTest
+    static void testPaymentControllerMethods() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Paid Controller', 30);
+            eventType.Price__c = 40;
+            update eventType;
+
+            Booking__c booking = SchedulingTestDataFactory.createBooking(
+                eventType.Id, testUser.Id, Datetime.now().addDays(7), Datetime.now().addDays(7).addMinutes(30)
+            );
+            booking.Status__c = 'Pending_Payment';
+            update booking;
+
+            Test.setMock(HttpCalloutMock.class, new StripePaymentIntentMock());
+            Test.startTest();
+            Payment__c payment = SchedulingController.createPaymentIntent(booking.Id);
+            Booking__c confirmed = SchedulingController.completePayment(booking.Id);
+            SchedulingController.scheduleBackgroundJobs();
+            Test.stopTest();
+
+            System.assertNotEquals(null, payment.Id);
+            System.assertEquals('Accepted', confirmed.Status__c);
+        }
+    }
+
+    private class StripePaymentIntentMock implements HttpCalloutMock {
+        public HTTPResponse respond(HTTPRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setStatusCode(200);
+            res.setBody('{"id":"pi_controller_123","status":"requires_payment_method"}');
+            return res;
         }
     }
 

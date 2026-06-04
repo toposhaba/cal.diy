@@ -217,6 +217,10 @@
                             Reference: {confirmedBooking.UID__c}
                         </p>
                     </template>
+                    <template lwc:if={isPendingPayment}>
+                        <p class="slds-m-top_small slds-text-body_small">Complete payment to confirm your booking.</p>
+                        <lightning-button label="Complete Payment" variant="brand" onclick={handleCompletePayment} class="slds-m-top_small"></lightning-button>
+                    </template>
                     <div class="slds-m-top_large">
                         <lightning-button label="Book Another" variant="neutral" onclick={handleStartOver}></lightning-button>
                     </div>

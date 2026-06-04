@@ -5,7 +5,8 @@ public with sharing class SchedulingController {
         Id targetUser = hostUserId != null ? hostUserId : UserInfo.getUserId();
         return [
             SELECT Id, Name, Slug__c, Duration_Minutes__c, Description__c,
-                   Location__c, Is_Active__c, Owner_User__c
+                   Location__c, Is_Active__c, Owner_User__c, Price__c,
+                   Success_Redirect_URL__c
             FROM Event_Type__c
             WHERE (Owner_User__c = :targetUser OR (Owner_User__c = null AND OwnerId = :targetUser))
                 AND Is_Active__c = true
@@ -200,9 +201,36 @@ public with sharing class SchedulingController {
         return et;
     }
 
+    @AuraEnabled
+    public static Payment__c createPaymentIntent(Id bookingId) {
+        try {
+            return PaymentService.createPaymentIntent(bookingId);
+        } catch (SchedulingException e) {
+            AuraHandledException ex = new AuraHandledException(e.getMessage());
+            ex.setMessage(e.getMessage());
+            throw ex;
+        }
+    }
+
+    @AuraEnabled
+    public static Booking__c completePayment(Id bookingId) {
+        try {
+            return BookingService.completePayment(bookingId);
+        } catch (SchedulingException e) {
+            AuraHandledException ex = new AuraHandledException(e.getMessage());
+            ex.setMessage(e.getMessage());
+            throw ex;
+        }
+    }
+
+    @AuraEnabled
+    public static void scheduleBackgroundJobs() {
+        SchedulingJobService.scheduleAllJobs();
+    }
+
     @AuraEnabled(cacheable=true)
-    public static List<Routing_Form__c> getActiveRoutingForms() {
-        return RoutingFormService.getActiveForms(UserInfo.getUserId());
+    public static List<Routing_Form__c> getActiveRoutingForms(Id hostUserId) {
+        return RoutingFormService.getActiveForms(hostUserId);
     }
 
     @AuraEnabled(cacheable=true)

@@ -1,13 +1,21 @@
 {
   "orgName": "Cal DIY Dev",
   "edition": "Developer",
-  "features": ["EnableSetPasswordInApi"],
+  "features": [
+    "EnableSetPasswordInApi",
+    "Communities",
+    "CustomerCommunityPlus",
+    "ExperienceBundle"
+  ],
   "settings": {
     "lightningExperienceSettings": {
       "enableS1DesktopEnabled": true
     },
     "mobileSettings": {
       "enableS1EncryptedStoragePref2": false
+    },
+    "experienceBundleSettings": {
+      "enableExperienceBundleMetadata": true
     }
   }
 }

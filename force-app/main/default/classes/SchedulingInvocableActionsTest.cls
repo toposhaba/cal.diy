@@ -166,6 +166,29 @@ private class SchedulingInvocableActionsTest {
     }
 
     @IsTest
+    static void testDeleteCalendarEventAction() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Delete Event', 30);
+            Booking__c booking = SchedulingTestDataFactory.createBooking(
+                eventType.Id, testUser.Id, Datetime.now().addDays(7), Datetime.now().addDays(7).addMinutes(30)
+            );
+
+            DeleteCalendarEventAction.Request req = new DeleteCalendarEventAction.Request();
+            req.bookingId = booking.Id;
+
+            Test.startTest();
+            List<DeleteCalendarEventAction.Result> results = DeleteCalendarEventAction.execute(
+                new List<DeleteCalendarEventAction.Request>{ req }
+            );
+            Test.stopTest();
+
+            System.assertNotEquals(null, results[0]);
+        }
+    }
+
+    @IsTest
     static void testCreateBookingAction() {
         User testUser = SchedulingTestDataFactory.createTestUser();
 

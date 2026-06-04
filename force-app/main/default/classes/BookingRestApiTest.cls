@@ -152,25 +152,6 @@ private class BookingRestApiTest {
     }
 
     @IsTest
-    static void testNotFoundEndpoint() {
-        User testUser = SchedulingTestDataFactory.createTestUser();
-
-        System.runAs(testUser) {
-            RestRequest req = new RestRequest();
-            req.requestURI = '/services/apexrest/scheduling/v1/nonexistent';
-            req.httpMethod = 'GET';
-            RestContext.request = req;
-            RestContext.response = new RestResponse();
-
-            Test.startTest();
-            BookingRestApi.doGet();
-            Test.stopTest();
-
-            System.assertEquals(404, RestContext.response.statusCode);
-        }
-    }
-
-    @IsTest
     static void testPatchReschedule() {
         User testUser = SchedulingTestDataFactory.createTestUser();
 
@@ -215,9 +196,115 @@ private class BookingRestApiTest {
         }
     }
 
+    @IsTest
+    static void testGetRoutingFormsAndEvaluate() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Routed', 30);
+            Routing_Form__c form = SchedulingTestDataFactory.createRoutingForm(testUser.Id, 'API Router');
+            Routing_Form_Field__c field = SchedulingTestDataFactory.createRoutingFormField(
+                form.Id, 'Topic', 'Select', 'Sales'
+            );
+            SchedulingTestDataFactory.createRoutingFormRoute(
+                form.Id, eventType.Id,
+                '{"fieldId":"' + field.Id + '","operator":"equals","value":"Sales"}'
+            );
+
+            RestRequest listReq = new RestRequest();
+            listReq.requestURI = '/services/apexrest/scheduling/v1/routing-forms';
+            listReq.httpMethod = 'GET';
+            listReq.params.put('hostUserId', testUser.Id);
+            RestContext.request = listReq;
+            RestContext.response = new RestResponse();
+
+            Test.startTest();
+            BookingRestApi.doGet();
+            System.assertEquals(200, RestContext.response.statusCode);
+
+            RestRequest fieldsReq = new RestRequest();
+            fieldsReq.requestURI = '/services/apexrest/scheduling/v1/routing-forms/' + form.Id + '/fields';
+            fieldsReq.httpMethod = 'GET';
+            RestContext.request = fieldsReq;
+            RestContext.response = new RestResponse();
+            BookingRestApi.doGet();
+            System.assertEquals(200, RestContext.response.statusCode);
+
+            Map<String, Object> body = new Map<String, Object>{
+                'fieldResponses' => new Map<String, String>{ field.Id => 'Sales' }
+            };
+            RestRequest evalReq = new RestRequest();
+            evalReq.requestURI = '/services/apexrest/scheduling/v1/routing-forms/' + form.Id + '/evaluate';
+            evalReq.httpMethod = 'POST';
+            evalReq.requestBody = Blob.valueOf(JSON.serialize(body));
+            RestContext.request = evalReq;
+            RestContext.response = new RestResponse();
+            BookingRestApi.doPost();
+            Test.stopTest();
+
+            System.assertEquals(200, RestContext.response.statusCode);
+        }
+    }
+
+    @IsTest
+    static void testCancelBookingViaRest() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Cancel API', 30);
+            Booking__c booking = SchedulingTestDataFactory.createBooking(
+                eventType.Id, testUser.Id, Datetime.now().addDays(5), Datetime.now().addDays(5).addMinutes(30)
+            );
+            Booking__c fetched = [SELECT UID__c FROM Booking__c WHERE Id = :booking.Id];
+
+            Test.setMock(HttpCalloutMock.class, new RestWebhookMock());
+
+            RestRequest req = new RestRequest();
+            req.requestURI = '/services/apexrest/scheduling/v1/bookings/' + fetched.UID__c + '/cancel';
+            req.httpMethod = 'POST';
+            req.requestBody = Blob.valueOf('{"reason":"Changed plans"}');
+            RestContext.request = req;
+            RestContext.response = new RestResponse();
+
+            Test.startTest();
+            BookingRestApi.doPost();
+            Test.stopTest();
+
+            System.assertEquals(200, RestContext.response.statusCode);
+        }
+    }
+
+    @IsTest
+    static void testNotFoundEndpoint() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            RestRequest req = new RestRequest();
+            req.requestURI = '/services/apexrest/scheduling/v1/nonexistent';
+            req.httpMethod = 'GET';
+            RestContext.request = req;
+            RestContext.response = new RestResponse();
+
+            Test.startTest();
+            BookingRestApi.doGet();
+            Test.stopTest();
+
+            System.assertEquals(404, RestContext.response.statusCode);
+        }
+    }
+
     private static Boolean isWeekend(Date d) {
         Datetime dt = Datetime.newInstance(d, Time.newInstance(12, 0, 0, 0));
         String dayName = dt.format('EEEE');
         return dayName == 'Saturday' || dayName == 'Sunday';
+    }
+
+    private class RestWebhookMock implements HttpCalloutMock {
+        public HTTPResponse respond(HTTPRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setStatusCode(200);
+            res.setBody('ok');
+            return res;
+        }
     }
 }

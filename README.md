@@ -16,8 +16,8 @@ A Salesforce-native scheduling port of Cal.DIY. Hosts define availability and ev
 | Recurring bookings | Implemented | Apex + booker UI in `calendarBooking`; series cancel in `bookingManager` |
 | Calendar sync | Implemented | Google, Microsoft; batch + schedulable jobs |
 | Webhooks & workflows | Implemented | Trigger-fired; admin object tabs |
-| REST API | Partial | Bookings/slots/event-types; routing via LWC/Apex |
-| Experience Cloud guest booking | Partial | LWCs are community-exposed; guest perm set only |
+| REST API | Implemented | Bookings, slots, routing, payments, recurring |
+| Experience Cloud guest booking | Implemented | Community-exposed LWCs with `hostUserId`; expanded `Scheduling_Booker` perm set |
 
 ## Lightning Web Components
 
@@ -80,13 +80,27 @@ Base URL: `/services/apexrest/scheduling/v1`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/event-types?hostUserId=...` | List active event types |
-| GET | `/slots?eventTypeId=...&startDate=...&endDate=...` | Available time slots |
+| GET | `/slots?eventTypeId=...&startDate=...&endDate=...` | Available time slots (includes seat counts) |
+| GET | `/routing-forms?hostUserId=...` | List routing forms for a host |
+| GET | `/routing-forms/:id/fields` | Routing form questions |
+| POST | `/routing-forms/:id/evaluate` | Evaluate answers and get target event type |
 | GET | `/bookings/:uid` | Get booking by UID |
 | POST | `/bookings` | Create a booking |
+| POST | `/bookings/recurring` | Create a recurring series |
 | POST | `/bookings/:uid/cancel` | Cancel a booking |
+| POST | `/bookings/:uid/confirm` | Confirm a pending booking |
+| POST | `/bookings/:uid/payment-intent` | Create Stripe payment intent |
+| POST | `/bookings/:uid/complete-payment` | Capture payment and confirm booking |
 | PATCH | `/bookings/:uid/reschedule` | Reschedule a booking |
+| POST | `/webhooks/stripe` | Stripe payment webhook |
 
-Routing forms are available via `SchedulingController` Apex methods and the `routingForm` LWC.
+## Experience Cloud
+
+1. Create a Digital Experience site and assign the **Scheduling_Booker** permission set to the guest user profile.
+2. Add the `calendarBooking` or `routingForm` component to a community page.
+3. Set the **Host User ID** design property to the Salesforce User Id of the host being booked.
+
+Routing forms are also available via `SchedulingController` Apex methods and the `routingForm` LWC.
 
 ## Permission Sets
 

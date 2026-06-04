@@ -553,4 +553,40 @@ private class BookingServiceTest {
             Test.stopTest();
         }
     }
+
+    @IsTest
+    static void testCancelBookingRefundsPayment() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Paid Cancel', 30);
+            Booking__c booking = SchedulingTestDataFactory.createBooking(
+                eventType.Id,
+                testUser.Id,
+                Datetime.now().addDays(7),
+                Datetime.now().addDays(7).addMinutes(30)
+            );
+
+            insert new Payment__c(
+                Booking__c = booking.Id,
+                Amount__c = 50,
+                Currency_Code__c = 'USD',
+                Status__c = 'Captured',
+                External_Payment_Id__c = 'pi_refund_123',
+                Provider__c = 'Stripe'
+            );
+
+            Test.startTest();
+            BookingService.cancelBooking(booking.Id, 'Refund test');
+            Test.stopTest();
+
+            Payment__c payment = [
+                SELECT Status__c
+                FROM Payment__c
+                WHERE Booking__c = :booking.Id
+                LIMIT 1
+            ];
+            System.assertEquals('Refunded', payment.Status__c);
+        }
+    }
 }

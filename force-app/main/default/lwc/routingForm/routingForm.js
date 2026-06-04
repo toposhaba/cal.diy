@@ -7,6 +7,7 @@ import createBooking from '@salesforce/apex/SchedulingController.createBooking';
 
 export default class RoutingForm extends LightningElement {
     @api routingFormId;
+    @api hostUserId;
     @track forms = [];
     @track fields = [];
     @track fieldValues = {};
@@ -36,7 +37,7 @@ export default class RoutingForm extends LightningElement {
     async loadForms() {
         this.isLoading = true;
         try {
-            this.forms = await getActiveRoutingForms();
+            this.forms = await getActiveRoutingForms({ hostUserId: this.hostUserId || null });
         } catch (err) {
             this.error = this.extractError(err);
         } finally {

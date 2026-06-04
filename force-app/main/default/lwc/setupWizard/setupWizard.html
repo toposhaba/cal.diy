@@ -242,9 +242,12 @@
                     </div>
                     <div class="slds-m-top_medium slds-text-align_center">
                         <p class="slds-text-body_regular slds-m-bottom_small">
-                            Your booking page is ready. Share the <strong>Calendar Booking</strong> tab with anyone who needs to schedule time with you.
+                            Your booking page is ready. Share the Calendar Booking tab or add the component to Experience Cloud with a Host User ID.
                         </p>
-                        <lightning-button label="Run Setup Again" variant="neutral" onclick={handleRestartWizard} class="slds-m-right_small"></lightning-button>
+                        <lightning-button label="Open Booking Page" variant="brand" onclick={handleOpenBookingPage} class="slds-m-right_x-small"></lightning-button>
+                        <lightning-button label="Manage Schedule" variant="neutral" onclick={handleOpenScheduleManager} class="slds-m-right_x-small"></lightning-button>
+                        <lightning-button label="View Bookings" variant="neutral" onclick={handleOpenBookingManager} class="slds-m-right_x-small"></lightning-button>
+                        <lightning-button label="Run Setup Again" variant="neutral" onclick={handleRestartWizard}></lightning-button>
                     </div>
                 </div>
             </lightning-card>

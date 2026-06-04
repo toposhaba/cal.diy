@@ -4,6 +4,8 @@ import getAvailableSlots from '@salesforce/apex/SchedulingController.getAvailabl
 import createBooking from '@salesforce/apex/SchedulingController.createBooking';
 import createBookingWithFields from '@salesforce/apex/SchedulingController.createBookingWithFields';
 import createRecurringSeries from '@salesforce/apex/SchedulingController.createRecurringSeries';
+import createPaymentIntent from '@salesforce/apex/SchedulingController.createPaymentIntent';
+import completePayment from '@salesforce/apex/SchedulingController.completePayment';
 import getBookingFormFields from '@salesforce/apex/SchedulingController.getBookingFormFields';
 
 export default class CalendarBooking extends LightningElement {
@@ -191,6 +193,12 @@ export default class CalendarBooking extends LightningElement {
             }
             this.bookingConfirmed = true;
             this.currentStep = 'confirmation';
+
+            if (this.isPendingPayment && this.confirmedBooking) {
+                await createPaymentIntent({ bookingId: this.confirmedBooking.Id });
+            } else if (this.successRedirectUrl) {
+                window.location.assign(this.successRedirectUrl);
+            }
         } catch (err) {
             this.error = this.extractError(err);
         } finally {
@@ -258,6 +266,27 @@ export default class CalendarBooking extends LightningElement {
 
     get isPendingPayment() {
         return this.confirmedBooking && this.confirmedBooking.Status__c === 'Pending_Payment';
+    }
+
+    get successRedirectUrl() {
+        return this.selectedEventType && this.selectedEventType.Success_Redirect_URL__c
+            ? this.selectedEventType.Success_Redirect_URL__c
+            : null;
+    }
+
+    async handleCompletePayment() {
+        this.isLoading = true;
+        this.error = undefined;
+        try {
+            this.confirmedBooking = await completePayment({ bookingId: this.confirmedBooking.Id });
+            if (this.successRedirectUrl) {
+                window.location.assign(this.successRedirectUrl);
+            }
+        } catch (err) {
+            this.error = this.extractError(err);
+        } finally {
+            this.isLoading = false;
+        }
     }
 
     get confirmationHeading() {
