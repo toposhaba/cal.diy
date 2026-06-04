@@ -173,6 +173,28 @@
                 </template>
 
                 <div class="slds-m-top_medium">
+                    <lightning-input type="checkbox" label="Book as recurring series" checked={isRecurring} onchange={handleRecurringChange}></lightning-input>
+                </div>
+                <template lwc:if={isRecurring}>
+                    <lightning-combobox
+                        label="Frequency"
+                        value={recurringFrequency}
+                        options={frequencyOptions}
+                        onchange={handleFrequencyChange}
+                        class="slds-m-top_small">
+                    </lightning-combobox>
+                    <lightning-input
+                        type="number"
+                        label="Number of occurrences"
+                        value={recurringOccurrences}
+                        min="2"
+                        max="52"
+                        onchange={handleOccurrencesChange}
+                        class="slds-m-top_small">
+                    </lightning-input>
+                </template>
+
+                <div class="slds-m-top_medium">
                     <lightning-button
                         label="Confirm Booking"
                         variant="brand"

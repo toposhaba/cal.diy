@@ -3,6 +3,7 @@ import getActiveEventTypes from '@salesforce/apex/SchedulingController.getActive
 import getAvailableSlots from '@salesforce/apex/SchedulingController.getAvailableSlots';
 import createBooking from '@salesforce/apex/SchedulingController.createBooking';
 import createBookingWithFields from '@salesforce/apex/SchedulingController.createBookingWithFields';
+import createRecurringSeries from '@salesforce/apex/SchedulingController.createRecurringSeries';
 import getBookingFormFields from '@salesforce/apex/SchedulingController.getBookingFormFields';
 
 export default class CalendarBooking extends LightningElement {
@@ -21,6 +22,9 @@ export default class CalendarBooking extends LightningElement {
     @track bookingConfirmed = false;
     @track confirmedBooking;
     @track currentStep = 'event-type';
+    @track isRecurring = false;
+    @track recurringFrequency = 'Weekly';
+    @track recurringOccurrences = 4;
 
     connectedCallback() {
         this.loadEventTypes();
@@ -138,6 +142,18 @@ export default class CalendarBooking extends LightningElement {
         this.bookerEmail = event.target.value;
     }
 
+    handleRecurringChange(event) {
+        this.isRecurring = event.target.checked;
+    }
+
+    handleFrequencyChange(event) {
+        this.recurringFrequency = event.detail.value;
+    }
+
+    handleOccurrencesChange(event) {
+        this.recurringOccurrences = parseInt(event.target.value, 10);
+    }
+
     async handleBookingSubmit() {
         if (!this.validateForm()) return;
 
@@ -153,6 +169,17 @@ export default class CalendarBooking extends LightningElement {
                     startDateTimeStr: this.selectedSlot.startTime,
                     fieldValues: values
                 });
+            } else if (this.isRecurring) {
+                const bookings = await createRecurringSeries({
+                    eventTypeId: this.selectedEventType.Id,
+                    firstStartDateTimeStr: this.selectedSlot.startTime,
+                    bookerEmail: this.bookerEmail,
+                    bookerName: this.bookerName,
+                    frequency: this.recurringFrequency,
+                    occurrences: this.recurringOccurrences,
+                    seriesEndDateStr: null
+                });
+                this.confirmedBooking = bookings[0];
             } else {
                 this.confirmedBooking = await createBooking({
                     eventTypeId: this.selectedEventType.Id,
@@ -191,6 +218,9 @@ export default class CalendarBooking extends LightningElement {
         this.bookerEmail = '';
         this.bookingConfirmed = false;
         this.confirmedBooking = null;
+        this.isRecurring = false;
+        this.recurringFrequency = 'Weekly';
+        this.recurringOccurrences = 4;
         this.error = undefined;
     }
 
@@ -234,7 +264,19 @@ export default class CalendarBooking extends LightningElement {
         if (this.isPendingPayment) {
             return 'Payment Required';
         }
+        if (this.isRecurring && this.bookingConfirmed) {
+            return 'Recurring Series Booked!';
+        }
         return this.isPendingBooking ? 'Booking Pending Approval' : 'Booking Confirmed!';
+    }
+
+    get frequencyOptions() {
+        return [
+            { label: 'Weekly', value: 'Weekly' },
+            { label: 'Biweekly', value: 'Biweekly' },
+            { label: 'Daily', value: 'Daily' },
+            { label: 'Monthly', value: 'Monthly' }
+        ];
     }
 
     get confirmationIcon() {

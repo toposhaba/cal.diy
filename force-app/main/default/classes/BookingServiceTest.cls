@@ -526,4 +526,31 @@ private class BookingServiceTest {
             System.assertEquals('Accepted', confirmed.Status__c);
         }
     }
+
+    @IsTest
+    static void testCancelBookingWhenDisabled() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'No Cancel', 30);
+            eventType.Disable_Cancellation__c = true;
+            update eventType;
+
+            Booking__c booking = SchedulingTestDataFactory.createBooking(
+                eventType.Id,
+                testUser.Id,
+                Datetime.now().addDays(7),
+                Datetime.now().addDays(7).addMinutes(30)
+            );
+
+            Test.startTest();
+            try {
+                BookingService.cancelBooking(booking.Id, 'Too late');
+                System.assert(false, 'Should block cancellation');
+            } catch (SchedulingException e) {
+                System.assertEquals('CANCELLATION_DISABLED', e.getErrorCode());
+            }
+            Test.stopTest();
+        }
+    }
 }

@@ -225,6 +225,41 @@ public class SchedulingTestDataFactory {
         return ooo;
     }
 
+    public static Routing_Form__c createRoutingForm(Id userId, String name) {
+        Routing_Form__c form = new Routing_Form__c(
+            Name = name,
+            Owner_User__c = userId,
+            Description__c = 'Test routing form'
+        );
+        insert form;
+        return form;
+    }
+
+    public static Routing_Form_Field__c createRoutingFormField(
+        Id formId, String name, String fieldType, String options
+    ) {
+        Routing_Form_Field__c field = new Routing_Form_Field__c(
+            Routing_Form__c = formId,
+            Name = name,
+            Field_Type__c = fieldType,
+            Options__c = options
+        );
+        insert field;
+        return field;
+    }
+
+    public static Routing_Form_Route__c createRoutingFormRoute(
+        Id formId, Id eventTypeId, String conditionJson
+    ) {
+        Routing_Form_Route__c route = new Routing_Form_Route__c(
+            Routing_Form__c = formId,
+            Target_Event_Type__c = eventTypeId,
+            Condition__c = conditionJson
+        );
+        insert route;
+        return route;
+    }
+
     private static String generateUID() {
         Blob randomBytes = Crypto.generateAesKey(128);
         String hex = EncodingUtil.convertToHex(randomBytes);

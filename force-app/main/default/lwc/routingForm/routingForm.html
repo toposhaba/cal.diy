@@ -1,0 +1,108 @@
+<template>
+    <lightning-card title="Find the Right Meeting" icon-name="standard:form">
+        <template lwc:if={isLoading}>
+            <div class="slds-align_absolute-center slds-p-around_large">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template lwc:if={error}>
+            <div class="slds-p-around_medium">
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <h2>{error}</h2>
+                </div>
+            </div>
+        </template>
+
+        <template lwc:if={isFormSelectStep}>
+            <div class="slds-p-around_medium">
+                <h2 class="slds-text-heading_small slds-m-bottom_medium">Choose a form</h2>
+                <template lwc:if={hasForms}>
+                    <template for:each={forms} for:item="form">
+                        <div key={form.Id} class="slds-box slds-m-bottom_small slds-box_link" data-id={form.Id} onclick={handleFormSelect}>
+                            <h3 class="slds-text-heading_small">{form.Name}</h3>
+                            <template lwc:if={form.Description__c}>
+                                <p class="slds-text-body_small slds-text-color_weak">{form.Description__c}</p>
+                            </template>
+                        </div>
+                    </template>
+                </template>
+                <template lwc:else>
+                    <template lwc:if={notLoading}>
+                        <p class="slds-text-color_weak">No routing forms configured.</p>
+                    </template>
+                </template>
+            </div>
+        </template>
+
+        <template lwc:if={isQuestionsStep}>
+            <div class="slds-p-around_medium">
+                <h2 class="slds-text-heading_small slds-m-bottom_medium">{selectedForm.Name}</h2>
+                <template for:each={renderableFields} for:item="field">
+                    <div key={field.id} class="slds-m-bottom_small">
+                        <template lwc:if={field.isSelect}>
+                            <lightning-combobox
+                                label={field.name}
+                                value={field.value}
+                                options={field.selectOptions}
+                                data-field={field.id}
+                                onchange={handleFieldChange}
+                                required>
+                            </lightning-combobox>
+                        </template>
+                        <template lwc:elseif={field.isEmail}>
+                            <lightning-input type="email" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required></lightning-input>
+                        </template>
+                        <template lwc:elseif={field.isPhone}>
+                            <lightning-input type="tel" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required></lightning-input>
+                        </template>
+                        <template lwc:else>
+                            <lightning-input type="text" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required></lightning-input>
+                        </template>
+                    </div>
+                </template>
+                <lightning-button label="Continue" variant="brand" onclick={handleEvaluateRoute} class="slds-m-top_medium"></lightning-button>
+            </div>
+        </template>
+
+        <template lwc:if={isDateSelectStep}>
+            <div class="slds-p-around_medium">
+                <h2 class="slds-text-heading_small">{resolvedEventType.eventTypeName}</h2>
+                <lightning-input type="date" label="Select Date" value={selectedDate} min={minDate} onchange={handleDateChange}></lightning-input>
+                <template lwc:if={hasSlots}>
+                    <h3 class="slds-text-heading_small slds-m-top_medium slds-m-bottom_small">Available Times</h3>
+                    <div class="slds-grid slds-wrap slds-gutters_xx-small">
+                        <template for:each={formattedSlots} for:item="slot">
+                            <div key={slot.index} class="slds-col slds-size_1-of-3 slds-m-bottom_xx-small">
+                                <lightning-button label={slot.slotLabel} data-index={slot.index} onclick={handleSlotSelect} variant="neutral"></lightning-button>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <template lwc:if={isBookingFormStep}>
+            <div class="slds-p-around_medium">
+                <h2 class="slds-text-heading_small">{resolvedEventType.eventTypeName}</h2>
+                <p class="slds-text-color_weak slds-m-bottom_medium">{selectedSlotFormatted}</p>
+                <lightning-input type="text" label="Your Name" value={bookerName} onchange={handleNameChange} required></lightning-input>
+                <lightning-input type="email" label="Your Email" value={bookerEmail} onchange={handleEmailChange} required class="slds-m-top_small"></lightning-input>
+                <lightning-button label="Confirm Booking" variant="brand" onclick={handleBookingSubmit} class="slds-m-top_medium"></lightning-button>
+            </div>
+        </template>
+
+        <template lwc:if={isConfirmationStep}>
+            <div class="slds-p-around_medium slds-text-align_center">
+                <lightning-icon icon-name="action:approval" size="large"></lightning-icon>
+                <h2 class="slds-text-heading_medium slds-m-top_small">Booking Confirmed!</h2>
+                <p>{resolvedEventType.eventTypeName}</p>
+                <p class="slds-text-body_small slds-text-color_weak">{selectedSlotFormatted}</p>
+                <template lwc:if={confirmedBooking}>
+                    <p class="slds-m-top_small slds-text-body_small">Reference: {confirmedBooking.UID__c}</p>
+                </template>
+                <lightning-button label="Start Over" variant="neutral" onclick={handleStartOver} class="slds-m-top_medium"></lightning-button>
+            </div>
+        </template>
+    </lightning-card>
+</template>

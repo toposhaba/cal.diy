@@ -17,13 +17,18 @@
     <tabs>Calendar_Booking</tabs>
     <tabs>Calendar_Connections</tabs>
     <tabs>Schedule_Manager</tabs>
+    <tabs>Routing_Booking</tabs>
     <tabs>Booking__c</tabs>
     <tabs>Event_Type__c</tabs>
+    <tabs>Routing_Form__c</tabs>
     <tabs>Schedule__c</tabs>
     <tabs>Availability__c</tabs>
     <tabs>Calendar_Connection__c</tabs>
     <tabs>Attendee__c</tabs>
     <tabs>Recurring_Pattern__c</tabs>
+    <tabs>Team__c</tabs>
+    <tabs>Webhook__c</tabs>
+    <tabs>Workflow__c</tabs>
     <uiType>Lightning</uiType>
     <utilityBar>Cal_DIY_UtilityBar</utilityBar>
 </CustomApplication>

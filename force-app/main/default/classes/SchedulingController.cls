@@ -201,6 +201,72 @@ public with sharing class SchedulingController {
     }
 
     @AuraEnabled(cacheable=true)
+    public static List<Routing_Form__c> getActiveRoutingForms() {
+        return RoutingFormService.getActiveForms(UserInfo.getUserId());
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<RoutingFormService.FormFieldInfo> getRoutingFormFields(Id routingFormId) {
+        return RoutingFormService.getFormFieldInfo(routingFormId);
+    }
+
+    @AuraEnabled
+    public static RoutingFormService.RoutingResult evaluateRoutingForm(
+        Id routingFormId, Map<String, String> fieldResponses
+    ) {
+        Map<Id, String> responses = new Map<Id, String>();
+        if (fieldResponses != null) {
+            for (String fieldId : fieldResponses.keySet()) {
+                responses.put((Id) fieldId, fieldResponses.get(fieldId));
+            }
+        }
+
+        try {
+            return RoutingFormService.evaluateForm(routingFormId, responses);
+        } catch (SchedulingException e) {
+            AuraHandledException ex = new AuraHandledException(e.getMessage());
+            ex.setMessage(e.getMessage());
+            throw ex;
+        }
+    }
+
+    @AuraEnabled
+    public static List<Booking__c> createRecurringSeries(
+        Id eventTypeId, String firstStartDateTimeStr, String bookerEmail, String bookerName,
+        String frequency, Integer occurrences, String seriesEndDateStr
+    ) {
+        RecurringBookingService.RecurringBookingRequest request = new RecurringBookingService.RecurringBookingRequest();
+        request.eventTypeId = eventTypeId;
+        request.firstStartDateTime = parseDateTimeString(firstStartDateTimeStr);
+        request.bookerEmail = bookerEmail;
+        request.bookerName = bookerName;
+        request.frequency = frequency;
+        request.occurrences = occurrences;
+        request.seriesEndDate = String.isNotBlank(seriesEndDateStr) ? Date.valueOf(seriesEndDateStr) : null;
+
+        try {
+            return RecurringBookingService.createRecurringSeries(request);
+        } catch (SchedulingException e) {
+            AuraHandledException ex = new AuraHandledException(e.getMessage());
+            ex.setMessage(e.getMessage());
+            throw ex;
+        }
+    }
+
+    @AuraEnabled
+    public static void cancelRecurringSeries(Id recurringPatternId, String reason, Boolean futureOnly) {
+        try {
+            RecurringBookingService.cancelRecurringSeries(
+                recurringPatternId, reason, futureOnly != null ? futureOnly : false
+            );
+        } catch (SchedulingException e) {
+            AuraHandledException ex = new AuraHandledException(e.getMessage());
+            ex.setMessage(e.getMessage());
+            throw ex;
+        }
+    }
+
+    @AuraEnabled(cacheable=true)
     public static List<Map<String, String>> getBookingFormFields() {
         List<Map<String, String>> fields = new List<Map<String, String>>();
         Schema.FieldSet fs = Schema.SObjectType.Booking__c.fieldSets.getMap().get('Booking_Form');

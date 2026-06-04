@@ -2,6 +2,9 @@ import { LightningElement, track } from 'lwc';
 import getMyBookings from '@salesforce/apex/SchedulingController.getMyBookings';
 import cancelBooking from '@salesforce/apex/SchedulingController.cancelBooking';
 import confirmBooking from '@salesforce/apex/SchedulingController.confirmBooking';
+import rescheduleBooking from '@salesforce/apex/SchedulingController.rescheduleBooking';
+import getAvailableSlots from '@salesforce/apex/SchedulingController.getAvailableSlots';
+import cancelRecurringSeries from '@salesforce/apex/SchedulingController.cancelRecurringSeries';
 
 export default class BookingManager extends LightningElement {
     @track bookings = [];
@@ -12,6 +15,14 @@ export default class BookingManager extends LightningElement {
     @track selectedBookingId;
     @track showCancelModal = false;
     @track cancelReason = '';
+    @track showRescheduleModal = false;
+    @track rescheduleBooking;
+    @track rescheduleDate;
+    @track rescheduleSlots = [];
+    @track selectedRescheduleSlot;
+    @track showSeriesCancelModal = false;
+    @track seriesPatternId;
+    @track seriesCancelReason = '';
 
     connectedCallback() {
         const today = new Date();
@@ -101,6 +112,100 @@ export default class BookingManager extends LightningElement {
         }
     }
 
+    handleRescheduleClick(event) {
+        const bookingId = event.currentTarget.dataset.id;
+        this.rescheduleBooking = this.bookings.find(b => b.Id === bookingId);
+        this.rescheduleDate = new Date(this.rescheduleBooking.Start_DateTime__c).toISOString().split('T')[0];
+        this.selectedRescheduleSlot = null;
+        this.showRescheduleModal = true;
+        this.loadRescheduleSlots();
+    }
+
+    handleRescheduleDateChange(event) {
+        this.rescheduleDate = event.target.value;
+        this.selectedRescheduleSlot = null;
+        this.loadRescheduleSlots();
+    }
+
+    async loadRescheduleSlots() {
+        if (!this.rescheduleBooking || !this.rescheduleDate) return;
+
+        this.isLoading = true;
+        try {
+            this.rescheduleSlots = await getAvailableSlots({
+                eventTypeId: this.rescheduleBooking.Event_Type__c,
+                startDateStr: this.rescheduleDate,
+                endDateStr: this.rescheduleDate
+            });
+        } catch (err) {
+            this.error = this.extractError(err);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    handleRescheduleSlotSelect(event) {
+        const slotIndex = parseInt(event.currentTarget.dataset.index, 10);
+        this.selectedRescheduleSlot = this.rescheduleSlots[slotIndex];
+    }
+
+    handleRescheduleModalClose() {
+        this.showRescheduleModal = false;
+        this.rescheduleBooking = null;
+        this.rescheduleSlots = [];
+        this.selectedRescheduleSlot = null;
+    }
+
+    async handleRescheduleConfirm() {
+        if (!this.selectedRescheduleSlot) return;
+
+        this.isLoading = true;
+        try {
+            await rescheduleBooking({
+                bookingId: this.rescheduleBooking.Id,
+                newStartDateTimeStr: this.selectedRescheduleSlot.startTime
+            });
+            this.handleRescheduleModalClose();
+            await this.loadBookings();
+        } catch (err) {
+            this.error = this.extractError(err);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    handleSeriesCancelClick(event) {
+        this.seriesPatternId = event.currentTarget.dataset.pattern;
+        this.showSeriesCancelModal = true;
+    }
+
+    handleSeriesCancelReasonChange(event) {
+        this.seriesCancelReason = event.target.value;
+    }
+
+    handleSeriesCancelModalClose() {
+        this.showSeriesCancelModal = false;
+        this.seriesPatternId = null;
+        this.seriesCancelReason = '';
+    }
+
+    async handleSeriesCancelConfirm() {
+        this.isLoading = true;
+        try {
+            await cancelRecurringSeries({
+                recurringPatternId: this.seriesPatternId,
+                reason: this.seriesCancelReason,
+                futureOnly: true
+            });
+            this.handleSeriesCancelModalClose();
+            await this.loadBookings();
+        } catch (err) {
+            this.error = this.extractError(err);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
     get hasBookings() {
         return this.bookings && this.bookings.length > 0;
     }
@@ -113,6 +218,16 @@ export default class BookingManager extends LightningElement {
         return !this.isLoading;
     }
 
+    get formattedRescheduleSlots() {
+        return this.rescheduleSlots.map((slot, index) => ({
+            ...slot,
+            index,
+            formattedTime: this.formatTime(slot.startTime),
+            buttonVariant: this.selectedRescheduleSlot && this.selectedRescheduleSlot.startTime === slot.startTime
+                ? 'brand' : 'neutral'
+        }));
+    }
+
     get formattedBookings() {
         return this.bookings.map(b => ({
             ...b,
@@ -120,6 +235,9 @@ export default class BookingManager extends LightningElement {
             formattedEnd: this.formatTime(b.End_DateTime__c),
             isPending: b.Status__c === 'Pending',
             isActive: b.Status__c === 'Accepted' || b.Status__c === 'Pending',
+            canCancel: (b.Status__c === 'Accepted' || b.Status__c === 'Pending') && !b.Event_Type__r?.Disable_Cancellation__c,
+            canReschedule: b.Status__c === 'Accepted' || b.Status__c === 'Pending',
+            hasSeries: !!b.Recurring_Pattern__c,
             statusClass: this.getStatusClass(b.Status__c)
         }));
     }

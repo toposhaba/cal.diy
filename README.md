@@ -1,81 +1,77 @@
 # Salesforce Native Calendar Scheduling
 
-A feature-complete calendar scheduling solution built natively on the Salesforce platform. Enables hosts to define their availability and allows bookers to schedule meetings through Lightning Web Components or REST API.
+A Salesforce-native scheduling port of Cal.DIY. Hosts define availability and event types; bookers schedule through Lightning Web Components or REST API.
 
-## Features
+## Feature Matrix
 
-- **Event Types** — Define bookable meeting templates with duration, buffers, and booking rules
-- **Availability Management** — Recurring weekly hours and date-specific overrides
-- **Booking Lifecycle** — Create, confirm, cancel, and reschedule with validation
-- **Recurring Bookings** — Daily, weekly, biweekly, and monthly series
-- **Calendar Integration** — Sync with Google Calendar and Microsoft Outlook via Named Credentials
-- **Conflict Detection** — Checks internal bookings + external calendar busy times
-- **Email Notifications** — Automatic HTML emails for all booking lifecycle events
-- **Platform Events** — Real-time event bus for downstream integrations
-- **REST API** — Full CRUD endpoint for external systems
-- **Batch Sync** — Schedulable job for periodic calendar synchronization
+| Area | Status | Notes |
+|------|--------|-------|
+| Event types & availability | Implemented | Schedules, working hours, date overrides |
+| Booking lifecycle | Implemented | Create, confirm, cancel, reschedule |
+| Team scheduling | Implemented | Round robin, collective, managed hosts |
+| Seated events | Implemented | Multi-seat slots with seat counts in UI |
+| Payments | Implemented | `Pending_Payment` gate; Stripe via Named Credential |
+| Video & ICS | Implemented | Auto meeting links; `.ics` on confirmation emails |
+| Routing forms | Implemented | Questionnaire routes to event type; `routingForm` LWC |
+| Recurring bookings | Implemented | Apex + booker UI in `calendarBooking`; series cancel in `bookingManager` |
+| Calendar sync | Implemented | Google, Microsoft; batch + schedulable jobs |
+| Webhooks & workflows | Implemented | Trigger-fired; admin object tabs |
+| REST API | Partial | Bookings/slots/event-types; routing via LWC/Apex |
+| Experience Cloud guest booking | Partial | LWCs are community-exposed; guest perm set only |
 
-## Project Structure
+## Lightning Web Components
 
-```
-force-app/main/default/
-├── classes/                    # Apex classes and test classes
-├── lwc/                        # Lightning Web Components
-│   ├── calendarBooking/        # Public booking flow
-│   ├── bookingManager/         # Host booking dashboard
-│   ├── scheduleManager/        # Availability configuration
-│   └── calendarConnections/    # Calendar integration management
-├── objects/                    # Custom objects and fields
-├── triggers/                   # Apex triggers
-├── namedCredentials/           # Google Calendar & Microsoft Graph
-├── externalCredentials/        # OAuth 2.0 configurations
-├── permissionsets/             # Host, Booker, Admin permission sets
-├── labels/                     # Custom Labels for i18n
-├── customMetadata/             # Scheduling configuration defaults
-└── platformEvents/             # Booking_Event__e
-```
+| Component | Purpose |
+|-----------|---------|
+| `calendarBooking` | Public booking flow with recurring series option |
+| `routingForm` | Routing questionnaire → event type → booking |
+| `bookingManager` | Host dashboard: confirm, cancel, reschedule, cancel series |
+| `scheduleManager` | Availability configuration |
+| `calendarConnections` | External calendar connections |
+| `setupWizard` | Onboarding wizard |
+| `bookingUtilityBar` | Utility bar shortcuts |
 
 ## Deployment
 
 ```bash
-# Deploy to a scratch org
-sf org create scratch -f config/project-scratch-def.json -a scheduling-dev
-sf project deploy start --source-dir force-app
-
-# Run all tests
-sf apex run test --test-level RunLocalTests --wait 10
-
-# Assign permission set
+sf org create scratch -f config/project-scratch-def.json -a cal-diy-dev -v devOrg
+sf project deploy start --source-dir force-app --test-level RunLocalTests
 sf org assign permset --name Scheduling_Host
+sf org assign permset --name Scheduling_Admin
 ```
 
 ## Security
 
-This solution is designed to pass Salesforce security review:
-
-- All Apex classes use `with sharing`
-- All SOQL queries enforce CRUD/FLS via `WITH USER_MODE`
-- All DML uses `as user` syntax
-- Named Credentials for all external callouts (no stored secrets)
-- Input validation on all user-supplied data
-- XSS prevention in email templates
-- Bind variables in all queries (no SOQL injection)
-- Permission sets follow principle of least privilege
-- Private sharing model on all custom objects
+- All Apex uses `with sharing`
+- SOQL uses `WITH USER_MODE`; DML uses `as user`
+- Named Credentials for external callouts
+- Input validation and XSS-safe email templates
+- Permission sets: `Scheduling_Host`, `Scheduling_Admin`, `Scheduling_Booker`
 
 ## Custom Objects
 
 | Object | Purpose |
 |--------|---------|
-| `Schedule__c` | Named working-hour templates |
-| `Availability__c` | Time windows (weekly hours or date overrides) |
+| `Schedule__c` | Working-hour templates |
+| `Availability__c` | Weekly hours or date overrides |
 | `Event_Type__c` | Bookable meeting definitions |
-| `Booking__c` | Scheduled meeting records |
+| `Booking__c` | Scheduled meetings |
 | `Attendee__c` | Booking participants |
+| `Booking_Seat__c` | Seated event seat reservations |
 | `Calendar_Connection__c` | External calendar integrations |
 | `Recurring_Pattern__c` | Recurring series configuration |
-| `Scheduling_Config__mdt` | Admin configuration (Custom Metadata) |
-| `Booking_Event__e` | Real-time Platform Event |
+| `Routing_Form__c` | Routing questionnaire definitions |
+| `Routing_Form_Field__c` | Routing form questions |
+| `Routing_Form_Route__c` | Conditional routes to event types |
+| `Payment__c` | Stripe payment records |
+| `Team__c` / `Team_Member__c` | Team scheduling |
+| `Event_Type_Host__c` | Host assignments for team types |
+| `Webhook__c` | Outbound webhook subscriptions |
+| `Workflow__c` / `Workflow_Step__c` | Automated workflow actions |
+| `Out_of_Office__c` | Host unavailability |
+| `Booking_Field__c` / `Booking_Field_Set__c` | Custom booking fields |
+| `Scheduling_Config__mdt` | Admin defaults (Custom Metadata) |
+| `Booking_Event__e` | Platform Event for integrations |
 
 ## REST API
 
@@ -84,19 +80,21 @@ Base URL: `/services/apexrest/scheduling/v1`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/event-types?hostUserId=...` | List active event types |
-| GET | `/slots?eventTypeId=...&startDate=...&endDate=...` | Get available time slots |
+| GET | `/slots?eventTypeId=...&startDate=...&endDate=...` | Available time slots |
 | GET | `/bookings/:uid` | Get booking by UID |
 | POST | `/bookings` | Create a booking |
 | POST | `/bookings/:uid/cancel` | Cancel a booking |
 | PATCH | `/bookings/:uid/reschedule` | Reschedule a booking |
 
+Routing forms are available via `SchedulingController` Apex methods and the `routingForm` LWC.
+
 ## Permission Sets
 
-| Permission Set | Target Users | Access Level |
-|---------------|--------------|--------------|
-| `Scheduling_Admin` | Administrators | Full CRUD + ViewAll/ModifyAll |
-| `Scheduling_Host` | Meeting hosts | CRUD on own records |
-| `Scheduling_Booker` | Internal/community bookers | Read event types, create bookings |
+| Permission Set | Target Users |
+|----------------|--------------|
+| `Scheduling_Admin` | Full admin access |
+| `Scheduling_Host` | Host scheduling operations |
+| `Scheduling_Booker` | Read event types, create bookings |
 
 ## License
 

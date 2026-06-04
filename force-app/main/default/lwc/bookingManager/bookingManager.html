@@ -49,7 +49,15 @@
                                         <template lwc:if={booking.isPending}>
                                             <lightning-button label="Confirm" variant="success" size="small" data-id={booking.Id} onclick={handleConfirm}></lightning-button>
                                         </template>
-                                        <lightning-button label="Cancel" variant="destructive" size="small" data-id={booking.Id} onclick={handleCancelClick} class="slds-m-left_xx-small"></lightning-button>
+                                        <template lwc:if={booking.canReschedule}>
+                                            <lightning-button label="Reschedule" variant="neutral" size="small" data-id={booking.Id} onclick={handleRescheduleClick} class="slds-m-left_xx-small"></lightning-button>
+                                        </template>
+                                        <template lwc:if={booking.canCancel}>
+                                            <lightning-button label="Cancel" variant="destructive" size="small" data-id={booking.Id} onclick={handleCancelClick} class="slds-m-left_xx-small"></lightning-button>
+                                        </template>
+                                        <template lwc:if={booking.hasSeries}>
+                                            <lightning-button label="Cancel Series" variant="destructive-text" size="small" data-pattern={booking.Recurring_Pattern__c} onclick={handleSeriesCancelClick} class="slds-m-left_xx-small"></lightning-button>
+                                        </template>
                                     </template>
                                 </td>
                             </tr>
@@ -68,7 +76,6 @@
         </div>
     </lightning-card>
 
-    <!-- Cancel Modal -->
     <template lwc:if={showCancelModal}>
         <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
             <div class="slds-modal__container">
@@ -82,6 +89,55 @@
                 <footer class="slds-modal__footer">
                     <lightning-button label="Go Back" onclick={handleCancelModalClose}></lightning-button>
                     <lightning-button label="Cancel Booking" variant="destructive" onclick={handleCancelConfirm}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <template lwc:if={showRescheduleModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleRescheduleModalClose} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">Reschedule Booking</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-input type="date" label="New Date" value={rescheduleDate} onchange={handleRescheduleDateChange}></lightning-input>
+                    <template lwc:if={formattedRescheduleSlots.length}>
+                        <h3 class="slds-text-heading_small slds-m-top_medium slds-m-bottom_small">Available Times</h3>
+                        <div class="slds-grid slds-wrap slds-gutters_xx-small">
+                            <template for:each={formattedRescheduleSlots} for:item="slot">
+                                <div key={slot.index} class="slds-col slds-size_1-of-3 slds-m-bottom_xx-small">
+                                    <lightning-button label={slot.formattedTime} data-index={slot.index} onclick={handleRescheduleSlotSelect} variant={slot.buttonVariant}></lightning-button>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Go Back" onclick={handleRescheduleModalClose}></lightning-button>
+                    <lightning-button label="Reschedule" variant="brand" onclick={handleRescheduleConfirm}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <template lwc:if={showSeriesCancelModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleSeriesCancelModalClose} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">Cancel Recurring Series</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <p class="slds-m-bottom_small">This cancels all future bookings in the series.</p>
+                    <lightning-textarea label="Cancellation Reason" value={seriesCancelReason} onchange={handleSeriesCancelReasonChange}></lightning-textarea>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Go Back" onclick={handleSeriesCancelModalClose}></lightning-button>
+                    <lightning-button label="Cancel Series" variant="destructive" onclick={handleSeriesCancelConfirm}></lightning-button>
                 </footer>
             </div>
         </section>

@@ -327,6 +327,68 @@ private class SchedulingControllerTest {
         }
     }
 
+    @IsTest
+    static void testEvaluateRoutingFormViaController() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Routed Meeting', 30);
+            Routing_Form__c form = SchedulingTestDataFactory.createRoutingForm(testUser.Id, 'Controller Router');
+            Routing_Form_Field__c field = SchedulingTestDataFactory.createRoutingFormField(
+                form.Id, 'Need', 'Select', 'Help'
+            );
+            SchedulingTestDataFactory.createRoutingFormRoute(
+                form.Id, eventType.Id,
+                '{"fieldId":"' + field.Id + '","operator":"equals","value":"Help"}'
+            );
+
+            Map<String, String> responses = new Map<String, String>{
+                field.Id => 'Help'
+            };
+
+            Test.startTest();
+            RoutingFormService.RoutingResult result = SchedulingController.evaluateRoutingForm(form.Id, responses);
+            List<Routing_Form__c> forms = SchedulingController.getActiveRoutingForms();
+            List<RoutingFormService.FormFieldInfo> fields = SchedulingController.getRoutingFormFields(form.Id);
+            Test.stopTest();
+
+            System.assertEquals(eventType.Id, result.eventTypeId);
+            System.assertEquals(1, forms.size());
+            System.assertEquals(1, fields.size());
+        }
+    }
+
+    @IsTest
+    static void testCreateRecurringSeriesViaController() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Schedule__c schedule = SchedulingTestDataFactory.createSchedule(testUser.Id, 'Work', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventTypeWithSchedule(
+                testUser.Id, schedule.Id, 'Controller Series', 30
+            );
+
+            Date futureDate = Date.today().addDays(14);
+            while (isWeekend(futureDate)) {
+                futureDate = futureDate.addDays(1);
+            }
+            Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(10, 0, 0, 0));
+            String startStr = startDt.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+
+            Test.startTest();
+            List<Booking__c> bookings = SchedulingController.createRecurringSeries(
+                eventType.Id, startStr, 'series@example.com', 'Series Booker', 'Weekly', 2, null
+            );
+            Test.stopTest();
+
+            System.assertEquals(2, bookings.size());
+        }
+    }
+
     private static Boolean isWeekend(Date d) {
         Datetime dt = Datetime.newInstance(d, Time.newInstance(12, 0, 0, 0));
         String dayName = dt.format('EEEE');

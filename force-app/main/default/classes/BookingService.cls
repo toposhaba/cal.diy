@@ -94,7 +94,7 @@ public with sharing class BookingService {
 
     public static Booking__c cancelBooking(Id bookingId, String reason) {
         List<Booking__c> bookingList = [
-            SELECT Id, Status__c, Host__c, Start_DateTime__c
+            SELECT Id, Status__c, Host__c, Start_DateTime__c, Event_Type__r.Disable_Cancellation__c
             FROM Booking__c
             WHERE Id = :bookingId
             WITH USER_MODE
@@ -105,6 +105,10 @@ public with sharing class BookingService {
             throw new SchedulingException('BOOKING_NOT_FOUND', 'Booking not found');
         }
         Booking__c booking = bookingList[0];
+
+        if (booking.Event_Type__r.Disable_Cancellation__c == true) {
+            throw new SchedulingException('CANCELLATION_DISABLED', 'Cancellation is not allowed for this event type');
+        }
 
         if (booking.Status__c == 'Cancelled') {
             throw new SchedulingException('ALREADY_CANCELLED', 'Booking is already cancelled');
@@ -190,7 +194,8 @@ public with sharing class BookingService {
         return [
             SELECT Id, UID__c, Title__c, Start_DateTime__c, End_DateTime__c,
                    Status__c, Location__c, Booker_Email__c, Booker_Name__c,
-                   Event_Type__r.Name, Event_Type__r.Duration_Minutes__c
+                   Event_Type__c, Event_Type__r.Name, Event_Type__r.Duration_Minutes__c,
+                   Event_Type__r.Disable_Cancellation__c, Recurring_Pattern__c
             FROM Booking__c
             WHERE Host__c = :hostUserId
                 AND Start_DateTime__c < :rangeEnd
