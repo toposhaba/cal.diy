@@ -3,6 +3,18 @@
     <description>Full admin permissions for scheduling application management</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>Scheduling Admin</label>
+    <classAccesses>
+        <apexClass>SchedulingController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <tabSettings>
+        <tab>routingFormBuilder</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>workflowBuilder</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <fieldPermissions>
         <editable>true</editable>
         <field>Attendee__c.Time_Zone__c</field>

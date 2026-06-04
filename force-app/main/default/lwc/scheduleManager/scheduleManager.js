@@ -2,6 +2,8 @@ import { LightningElement, track } from 'lwc';
 import getMySchedules from '@salesforce/apex/SchedulingController.getMySchedules';
 import createSchedule from '@salesforce/apex/SchedulingController.createSchedule';
 import addAvailability from '@salesforce/apex/SchedulingController.addAvailability';
+import getMyTravelSchedules from '@salesforce/apex/SchedulingController.getMyTravelSchedules';
+import createTravelSchedule from '@salesforce/apex/SchedulingController.createTravelSchedule';
 
 export default class ScheduleManager extends LightningElement {
     @track schedules = [];
@@ -19,7 +21,13 @@ export default class ScheduleManager extends LightningElement {
     availabilityDays = '';
     availabilityStartTime = '';
     availabilityEndTime = '';
-    availabilityOverrideDate = '';
+    @track showAddTravelForm = false;
+    @track travelSchedules = [];
+
+    newTravelName = '';
+    newTravelStartDate = '';
+    newTravelEndDate = '';
+    newTravelTimeZone = '';
 
     get dayOptions() {
         return [
@@ -103,6 +111,15 @@ export default class ScheduleManager extends LightningElement {
 
     connectedCallback() {
         this.loadSchedules();
+        this.loadTravelSchedules();
+    }
+
+    async loadTravelSchedules() {
+        try {
+            this.travelSchedules = await getMyTravelSchedules();
+        } catch (err) {
+            this.travelSchedules = [];
+        }
     }
 
     async loadSchedules() {
@@ -238,6 +255,57 @@ export default class ScheduleManager extends LightningElement {
     handleCancelAddAvailability() {
         this.showAddAvailabilityForm = false;
         this.resetAvailabilityForm();
+    }
+
+    handleAddTravelClick() {
+        this.showAddTravelForm = true;
+    }
+
+    handleTravelNameChange(event) {
+        this.newTravelName = event.target.value;
+    }
+
+    handleTravelStartChange(event) {
+        this.newTravelStartDate = event.target.value;
+    }
+
+    handleTravelEndChange(event) {
+        this.newTravelEndDate = event.target.value;
+    }
+
+    handleTravelTimeZoneChange(event) {
+        this.newTravelTimeZone = event.detail.value;
+    }
+
+    async handleCreateTravelSchedule() {
+        if (!this.newTravelStartDate || !this.newTravelEndDate || !this.newTravelTimeZone) {
+            this.error = 'All travel schedule fields are required';
+            return;
+        }
+
+        this.isLoading = true;
+        this.error = undefined;
+        try {
+            await createTravelSchedule({
+                startDateStr: this.newTravelStartDate,
+                endDateStr: this.newTravelEndDate,
+                timeZone: this.newTravelTimeZone
+            });
+            this.showAddTravelForm = false;
+            this.newTravelName = '';
+            this.newTravelStartDate = '';
+            this.newTravelEndDate = '';
+            this.newTravelTimeZone = '';
+            await this.loadTravelSchedules();
+        } catch (err) {
+            this.error = this.extractError(err);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    handleCancelAddTravel() {
+        this.showAddTravelForm = false;
     }
 
     resetAvailabilityForm() {

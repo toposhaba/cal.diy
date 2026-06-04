@@ -59,7 +59,8 @@ private class SchedulingControllerTest {
             List<AvailabilityService.TimeSlot> slots = SchedulingController.getAvailableSlots(
                 eventType.Id,
                 String.valueOf(futureDate),
-                String.valueOf(futureDate)
+                String.valueOf(futureDate),
+                null
             );
             Test.stopTest();
 
@@ -79,7 +80,8 @@ private class SchedulingControllerTest {
                 SchedulingController.getAvailableSlots(
                     eventType.Id,
                     String.valueOf(Date.today().addDays(10)),
-                    String.valueOf(Date.today())
+                    String.valueOf(Date.today()),
+                    null
                 );
                 System.assert(false, 'Should have thrown exception');
             } catch (AuraHandledException e) {
@@ -101,7 +103,8 @@ private class SchedulingControllerTest {
                 SchedulingController.getAvailableSlots(
                     eventType.Id,
                     String.valueOf(Date.today()),
-                    String.valueOf(Date.today().addDays(90))
+                    String.valueOf(Date.today().addDays(90)),
+                    null
                 );
                 System.assert(false, 'Should have thrown exception');
             } catch (AuraHandledException e) {
@@ -386,6 +389,64 @@ private class SchedulingControllerTest {
             Test.stopTest();
 
             System.assertEquals(2, bookings.size());
+        }
+    }
+
+    @IsTest
+    static void testRoutingFormBuilderMethods() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Builder Route', 30);
+
+            Test.startTest();
+            Routing_Form__c form = SchedulingController.saveRoutingForm(null, 'Builder Form', 'Desc');
+            Routing_Form_Field__c field = SchedulingController.saveRoutingField(
+                null, form.Id, 'Company Size', 'Select', 'Small\nLarge'
+            );
+            Routing_Form_Route__c route = SchedulingController.saveRoutingRoute(
+                null, form.Id, eventType.Id, field.Id, 'equals', 'Large'
+            );
+            SchedulingController.RoutingFormDetail detail = SchedulingController.getRoutingFormDetail(form.Id);
+            SchedulingController.saveRoutingForm(form.Id, 'Updated Form', 'Updated');
+            SchedulingController.saveRoutingField(field.Id, form.Id, 'Company Size', 'Select', 'Small\nMedium\nLarge');
+            SchedulingController.saveRoutingRoute(route.Id, form.Id, eventType.Id, field.Id, 'contains', 'Med');
+            SchedulingController.deleteRoutingRoute(route.Id);
+            SchedulingController.deleteRoutingField(field.Id);
+            Test.stopTest();
+
+            System.assertEquals('Builder Form', detail.name);
+            System.assertEquals(1, detail.fields.size());
+            System.assertEquals(1, detail.routes.size());
+        }
+    }
+
+    @IsTest
+    static void testWorkflowBuilderMethods() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Workflow Event', 30);
+
+            Test.startTest();
+            Workflow__c workflow = SchedulingController.saveWorkflow(
+                null, 'Builder Workflow', 'New_Booking', eventType.Id, true, null
+            );
+            Workflow_Step__c step = SchedulingController.saveWorkflowStep(
+                null, workflow.Id, 'Email', 'Attendee', 'Hello {attendee.name}', null, 1
+            );
+            List<Workflow__c> workflows = SchedulingController.getMyWorkflows();
+            SchedulingController.WorkflowDetail detail = SchedulingController.getWorkflowDetail(workflow.Id);
+            SchedulingController.saveWorkflow(workflow.Id, 'Updated Workflow', 'Booking_Confirmed', null, false, null);
+            SchedulingController.saveWorkflowStep(
+                step.Id, workflow.Id, 'SMS', 'Host', 'Reminder', null, 2
+            );
+            SchedulingController.deleteWorkflowStep(step.Id);
+            Test.stopTest();
+
+            System.assertEquals(1, workflows.size());
+            System.assertEquals('Builder Workflow', detail.name);
+            System.assertEquals(1, detail.steps.size());
         }
     }
 

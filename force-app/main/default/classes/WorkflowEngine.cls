@@ -10,8 +10,8 @@ public with sharing class WorkflowEngine {
         }
 
         List<Booking__c> bookings = [
-            SELECT Id, Event_Type__c, Host__c, Host__r.Email, Host__r.Name,
-                   Booker_Email__c, Booker_Name__c, Title__c,
+            SELECT Id, Event_Type__c, Host__c, Host__r.Email, Host__r.Name, Host__r.Phone,
+                   Booker_Email__c, Booker_Name__c, Booker_Phone__c, Title__c,
                    Start_DateTime__c, End_DateTime__c, Location__c
             FROM Booking__c
             WHERE Id IN :bookingIds
@@ -147,7 +147,12 @@ public with sharing class WorkflowEngine {
     }
 
     private static void sendSmsStep(Workflow_Step__c step, Booking__c booking) {
-        System.debug(LoggingLevel.INFO, 'SMS step placeholder - integrate with Twilio/MessageBird Named Credential');
+        String message = mergeTemplate(step.Template__c, booking);
+        String phone = SmsService.resolvePhone(booking, step.Recipient__c);
+        if (String.isBlank(phone)) {
+            return;
+        }
+        SmsService.sendSms(phone, message);
     }
 
     private static void sendWebhookStep(Workflow_Step__c step, Booking__c booking) {

@@ -37,6 +37,22 @@
             </div>
         </template>
 
+        <template lwc:if={isDurationSelectStep}>
+            <div class="slds-p-around_medium">
+                <div class="slds-m-bottom_medium">
+                    <lightning-button label="Back" variant="neutral" onclick={handleBack}></lightning-button>
+                </div>
+                <h2 class="slds-text-heading_small slds-m-bottom_medium">Choose Duration</h2>
+                <lightning-combobox
+                    label="Duration"
+                    value={selectedDuration}
+                    options={durationOptions}
+                    onchange={handleDurationSelect}
+                    required>
+                </lightning-combobox>
+            </div>
+        </template>
+
         <!-- Step 2: Date & Time Selection -->
         <template lwc:if={isDateSelectStep}>
             <div class="slds-p-around_medium">
@@ -44,7 +60,7 @@
                     <lightning-button label="Back" variant="neutral" onclick={handleBack}></lightning-button>
                 </div>
                 <h2 class="slds-text-heading_small slds-m-bottom_small">
-                    {selectedEventType.Name} - {selectedEventType.Duration_Minutes__c} min
+                    {selectedEventType.Name} - {eventTypeDurationLabel}
                 </h2>
                 <lightning-input
                     type="date"
@@ -88,6 +104,70 @@
                 </div>
                 <h2 class="slds-text-heading_small slds-m-bottom_small">{selectedEventType.Name}</h2>
                 <p class="slds-m-bottom_medium slds-text-color_weak">{selectedSlotFormatted}</p>
+
+                <template lwc:if={hasCustomBookingFields}>
+                    <template for:each={renderableCustomFields} for:item="field">
+                        <div key={field.id} class="slds-m-bottom_small">
+                            <template lwc:if={field.isSelect}>
+                                <lightning-combobox
+                                    label={field.name}
+                                    value={field.value}
+                                    options={field.selectOptions}
+                                    data-field={field.id}
+                                    onchange={handleCustomFieldChange}
+                                    required={field.required}>
+                                </lightning-combobox>
+                            </template>
+                            <template lwc:elseif={field.isCheckbox}>
+                                <lightning-input
+                                    type="checkbox"
+                                    label={field.name}
+                                    data-field={field.id}
+                                    onchange={handleCustomFieldChange}>
+                                </lightning-input>
+                            </template>
+                            <template lwc:elseif={field.isTextArea}>
+                                <lightning-textarea
+                                    label={field.name}
+                                    value={field.value}
+                                    data-field={field.id}
+                                    onchange={handleCustomFieldChange}
+                                    required={field.required}>
+                                </lightning-textarea>
+                            </template>
+                            <template lwc:elseif={field.isPhone}>
+                                <lightning-input
+                                    type="tel"
+                                    label={field.name}
+                                    value={field.value}
+                                    data-field={field.id}
+                                    onchange={handleCustomFieldChange}
+                                    required={field.required}>
+                                </lightning-input>
+                            </template>
+                            <template lwc:elseif={field.isEmail}>
+                                <lightning-input
+                                    type="email"
+                                    label={field.name}
+                                    value={field.value}
+                                    data-field={field.id}
+                                    onchange={handleCustomFieldChange}
+                                    required={field.required}>
+                                </lightning-input>
+                            </template>
+                            <template lwc:else>
+                                <lightning-input
+                                    type="text"
+                                    label={field.name}
+                                    value={field.value}
+                                    data-field={field.id}
+                                    onchange={handleCustomFieldChange}
+                                    required={field.required}>
+                                </lightning-input>
+                            </template>
+                        </div>
+                    </template>
+                </template>
 
                 <template lwc:if={hasFieldSet}>
                     <template for:each={renderableFields} for:item="field">
@@ -154,6 +234,30 @@
 
                 <template lwc:if={hasFieldSet}>
                 </template>
+                <template lwc:elseif={hasCustomBookingFields}>
+                    <lightning-input
+                        type="text"
+                        label="Your Name"
+                        value={bookerName}
+                        onchange={handleNameChange}
+                        required>
+                    </lightning-input>
+                    <lightning-input
+                        type="email"
+                        label="Your Email"
+                        value={bookerEmail}
+                        onchange={handleEmailChange}
+                        required
+                        class="slds-m-top_small">
+                    </lightning-input>
+                    <lightning-input
+                        type="tel"
+                        label="Your Phone"
+                        value={bookerPhone}
+                        onchange={handlePhoneChange}
+                        class="slds-m-top_small">
+                    </lightning-input>
+                </template>
                 <template lwc:else>
                     <lightning-input
                         type="text"
@@ -168,6 +272,13 @@
                         value={bookerEmail}
                         onchange={handleEmailChange}
                         required
+                        class="slds-m-top_small">
+                    </lightning-input>
+                    <lightning-input
+                        type="tel"
+                        label="Your Phone"
+                        value={bookerPhone}
+                        onchange={handlePhoneChange}
                         class="slds-m-top_small">
                     </lightning-input>
                 </template>
@@ -219,6 +330,9 @@
                     </template>
                     <template lwc:if={isPendingPayment}>
                         <p class="slds-m-top_small slds-text-body_small">Complete payment to confirm your booking.</p>
+                        <template lwc:if={paymentCheckoutInfo}>
+                            <p class="slds-text-body_small slds-m-top_x-small">Payment reference: {paymentCheckoutInfo.paymentId}</p>
+                        </template>
                         <lightning-button label="Complete Payment" variant="brand" onclick={handleCompletePayment} class="slds-m-top_small"></lightning-button>
                     </template>
                     <div class="slds-m-top_large">

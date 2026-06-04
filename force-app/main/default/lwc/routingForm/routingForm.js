@@ -104,7 +104,8 @@ export default class RoutingForm extends LightningElement {
             this.availableSlots = await getAvailableSlots({
                 eventTypeId: this.resolvedEventType.eventTypeId,
                 startDateStr: this.selectedDate,
-                endDateStr: this.selectedDate
+                endDateStr: this.selectedDate,
+                durationMinutes: null
             });
         } catch (err) {
             this.error = this.extractError(err);

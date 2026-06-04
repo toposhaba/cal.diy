@@ -53,6 +53,12 @@ public with sharing class TeamSchedulingService {
     public static List<AvailabilityService.TimeSlot> getRoundRobinAvailableSlots(
         Id eventTypeId, Date startDate, Date endDate
     ) {
+        return getRoundRobinAvailableSlots(eventTypeId, startDate, endDate, null);
+    }
+
+    public static List<AvailabilityService.TimeSlot> getRoundRobinAvailableSlots(
+        Id eventTypeId, Date startDate, Date endDate, Integer durationMinutes
+    ) {
         Event_Type__c eventType = getEventType(eventTypeId);
         List<Id> hostIds = resolveHostsForAvailability(eventType);
         if (hostIds.isEmpty()) {
@@ -62,7 +68,7 @@ public with sharing class TeamSchedulingService {
         Map<String, AvailabilityService.TimeSlot> slotMap = new Map<String, AvailabilityService.TimeSlot>();
         for (Id hostId : hostIds) {
             for (AvailabilityService.TimeSlot slot : AvailabilityService.getAvailableSlotsForHost(
-                eventTypeId, hostId, startDate, endDate
+                eventTypeId, hostId, startDate, endDate, durationMinutes
             )) {
                 slotMap.put(buildSlotKey(slot.startTime, slot.endTime), slot);
             }
@@ -172,6 +178,12 @@ public with sharing class TeamSchedulingService {
     public static List<AvailabilityService.TimeSlot> getCollectiveAvailableSlots(
         Id eventTypeId, Date startDate, Date endDate
     ) {
+        return getCollectiveAvailableSlots(eventTypeId, startDate, endDate, null);
+    }
+
+    public static List<AvailabilityService.TimeSlot> getCollectiveAvailableSlots(
+        Id eventTypeId, Date startDate, Date endDate, Integer durationMinutes
+    ) {
         Event_Type__c eventType = getEventType(eventTypeId);
         List<Id> hostIds = resolveHostsForAvailability(eventType);
         if (hostIds.isEmpty()) {
@@ -179,11 +191,13 @@ public with sharing class TeamSchedulingService {
         }
 
         List<AvailabilityService.TimeSlot> collectiveSlots =
-            AvailabilityService.getAvailableSlotsForHost(eventTypeId, hostIds[0], startDate, endDate);
+            AvailabilityService.getAvailableSlotsForHost(
+                eventTypeId, hostIds[0], startDate, endDate, durationMinutes
+            );
 
         for (Integer i = 1; i < hostIds.size(); i++) {
             List<AvailabilityService.TimeSlot> hostSlots = AvailabilityService.getAvailableSlotsForHost(
-                eventTypeId, hostIds[i], startDate, endDate
+                eventTypeId, hostIds[i], startDate, endDate, durationMinutes
             );
             collectiveSlots = intersectTimeSlots(collectiveSlots, hostSlots);
         }

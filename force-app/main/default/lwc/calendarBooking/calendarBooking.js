@@ -1,10 +1,13 @@
 import { LightningElement, api, track } from 'lwc';
 import getActiveEventTypes from '@salesforce/apex/SchedulingController.getActiveEventTypes';
 import getAvailableSlots from '@salesforce/apex/SchedulingController.getAvailableSlots';
+import getEventTypeDurations from '@salesforce/apex/SchedulingController.getEventTypeDurations';
 import createBooking from '@salesforce/apex/SchedulingController.createBooking';
 import createBookingWithFields from '@salesforce/apex/SchedulingController.createBookingWithFields';
+import createBookingWithCustomFields from '@salesforce/apex/SchedulingController.createBookingWithCustomFields';
+import getBookingFieldsForEventType from '@salesforce/apex/SchedulingController.getBookingFieldsForEventType';
 import createRecurringSeries from '@salesforce/apex/SchedulingController.createRecurringSeries';
-import createPaymentIntent from '@salesforce/apex/SchedulingController.createPaymentIntent';
+import getPaymentCheckoutInfo from '@salesforce/apex/SchedulingController.getPaymentCheckoutInfo';
 import completePayment from '@salesforce/apex/SchedulingController.completePayment';
 import getBookingFormFields from '@salesforce/apex/SchedulingController.getBookingFormFields';
 
@@ -27,6 +30,12 @@ export default class CalendarBooking extends LightningElement {
     @track isRecurring = false;
     @track recurringFrequency = 'Weekly';
     @track recurringOccurrences = 4;
+    @track durationOptions = [];
+    @track selectedDuration;
+    @track customBookingFields = [];
+    @track customFieldValues = {};
+    @track paymentCheckoutInfo;
+    @track bookerPhone = '';
 
     connectedCallback() {
         this.loadEventTypes();
@@ -43,6 +52,44 @@ export default class CalendarBooking extends LightningElement {
 
     get hasFieldSet() {
         return this.formFields && this.formFields.length > 0;
+    }
+
+    get hasCustomBookingFields() {
+        return this.customBookingFields && this.customBookingFields.length > 0;
+    }
+
+    get renderableCustomFields() {
+        return this.customBookingFields.map(f => ({
+            ...f,
+            isSelect: f.fieldType === 'Select' || f.fieldType === 'RadioGroup',
+            isMultiSelect: f.fieldType === 'MultiSelect',
+            isCheckbox: f.fieldType === 'Checkbox',
+            isTextArea: f.fieldType === 'TextArea',
+            isPhone: f.fieldType === 'Phone',
+            isEmail: f.fieldType === 'Email',
+            isNumber: f.fieldType === 'Number',
+            isText: f.fieldType === 'Text',
+            selectOptions: (f.options || []).map(o => ({ label: o, value: o })),
+            value: this.customFieldValues[f.id] || ''
+        }));
+    }
+
+    get hasMultipleDurations() {
+        return this.durationOptions && this.durationOptions.length > 1;
+    }
+
+    get isDurationStep() {
+        return this.currentStep === 'duration-select';
+    }
+
+    get eventTypeDurationLabel() {
+        if (!this.selectedEventType) {
+            return '';
+        }
+        if (this.selectedDuration) {
+            return `${this.selectedDuration} minutes`;
+        }
+        return `${this.selectedEventType.Duration_Minutes__c} minutes`;
     }
 
     get renderableFields() {
@@ -94,8 +141,52 @@ export default class CalendarBooking extends LightningElement {
     handleEventTypeSelect(event) {
         const eventTypeId = event.currentTarget.dataset.id;
         this.selectedEventType = this.eventTypes.find(et => et.Id === eventTypeId);
+        this.selectedDuration = null;
+        this.customBookingFields = [];
+        this.customFieldValues = {};
+        this.loadEventTypeConfig(eventTypeId);
+    }
+
+    async loadEventTypeConfig(eventTypeId) {
+        this.isLoading = true;
+        this.error = undefined;
+        try {
+            const [durations, customFields] = await Promise.all([
+                getEventTypeDurations({ eventTypeId }),
+                getBookingFieldsForEventType({ eventTypeId })
+            ]);
+            this.durationOptions = (durations || []).map(d => ({
+                label: `${d} minutes`,
+                value: d
+            }));
+            this.customBookingFields = customFields || [];
+            if (this.durationOptions.length === 1) {
+                this.selectedDuration = this.durationOptions[0].value;
+                this.currentStep = 'date-select';
+                this.loadSlotsForWeek();
+            } else {
+                this.currentStep = 'duration-select';
+            }
+        } catch (err) {
+            this.error = this.extractError(err);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    handleDurationSelect(event) {
+        this.selectedDuration = parseInt(event.detail.value, 10);
         this.currentStep = 'date-select';
         this.loadSlotsForWeek();
+    }
+
+    handleCustomFieldChange(event) {
+        const fieldId = event.target.dataset.field;
+        this.customFieldValues = { ...this.customFieldValues, [fieldId]: event.target.value };
+    }
+
+    handlePhoneChange(event) {
+        this.bookerPhone = event.target.value;
     }
 
     handleDateChange(event) {
@@ -121,7 +212,8 @@ export default class CalendarBooking extends LightningElement {
             this.availableSlots = await getAvailableSlots({
                 eventTypeId: this.selectedEventType.Id,
                 startDateStr: startDate,
-                endDateStr: endDate
+                endDateStr: endDate,
+                durationMinutes: this.selectedDuration
             });
         } catch (err) {
             this.error = this.extractError(err);
@@ -162,7 +254,16 @@ export default class CalendarBooking extends LightningElement {
         this.isLoading = true;
         this.error = undefined;
         try {
-            if (this.hasFieldSet) {
+            if (this.hasCustomBookingFields) {
+                this.confirmedBooking = await createBookingWithCustomFields({
+                    eventTypeId: this.selectedEventType.Id,
+                    startDateTimeStr: this.selectedSlot.startTime,
+                    bookerEmail: this.bookerEmail,
+                    bookerName: this.bookerName,
+                    bookerPhone: this.bookerPhone,
+                    customFieldResponses: this.customFieldValues
+                });
+            } else if (this.hasFieldSet) {
                 const values = { ...this.fieldValues };
                 if (!values.Booker_Name__c) values.Booker_Name__c = this.bookerName;
                 if (!values.Booker_Email__c) values.Booker_Email__c = this.bookerEmail;
@@ -195,7 +296,7 @@ export default class CalendarBooking extends LightningElement {
             this.currentStep = 'confirmation';
 
             if (this.isPendingPayment && this.confirmedBooking) {
-                await createPaymentIntent({ bookingId: this.confirmedBooking.Id });
+                this.paymentCheckoutInfo = await getPaymentCheckoutInfo({ bookingId: this.confirmedBooking.Id });
             } else if (this.successRedirectUrl) {
                 window.location.assign(this.successRedirectUrl);
             }
@@ -211,9 +312,16 @@ export default class CalendarBooking extends LightningElement {
             this.currentStep = 'date-select';
             this.selectedSlot = null;
         } else if (this.currentStep === 'date-select') {
+            this.currentStep = this.hasMultipleDurations ? 'duration-select' : 'event-type';
+            if (this.currentStep === 'event-type') {
+                this.selectedEventType = null;
+                this.availableSlots = [];
+            }
+        } else if (this.currentStep === 'duration-select') {
             this.currentStep = 'event-type';
             this.selectedEventType = null;
-            this.availableSlots = [];
+            this.durationOptions = [];
+            this.selectedDuration = null;
         }
     }
 
@@ -224,6 +332,12 @@ export default class CalendarBooking extends LightningElement {
         this.selectedSlot = null;
         this.bookerName = '';
         this.bookerEmail = '';
+        this.bookerPhone = '';
+        this.customBookingFields = [];
+        this.customFieldValues = {};
+        this.durationOptions = [];
+        this.selectedDuration = null;
+        this.paymentCheckoutInfo = null;
         this.bookingConfirmed = false;
         this.confirmedBooking = null;
         this.isRecurring = false;
@@ -246,6 +360,10 @@ export default class CalendarBooking extends LightningElement {
 
     get isEventTypeStep() {
         return this.currentStep === 'event-type';
+    }
+
+    get isDurationSelectStep() {
+        return this.currentStep === 'duration-select';
     }
 
     get isDateSelectStep() {

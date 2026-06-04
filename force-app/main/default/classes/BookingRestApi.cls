@@ -297,7 +297,13 @@ global with sharing class BookingRestApi {
             return;
         }
 
-        List<AvailabilityService.TimeSlot> slots = AvailabilityService.getAvailableSlots(eventTypeId, startDate, endDate);
+        String durationParam = req.params.get('durationMinutes');
+        Integer durationMinutes = String.isNotBlank(durationParam)
+            ? Integer.valueOf(durationParam) : null;
+
+        List<AvailabilityService.TimeSlot> slots = AvailabilityService.getAvailableSlots(
+            eventTypeId, startDate, endDate, durationMinutes
+        );
 
         List<SlotResponse> slotResponses = new List<SlotResponse>();
         for (AvailabilityService.TimeSlot slot : slots) {

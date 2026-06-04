@@ -1,0 +1,199 @@
+<template>
+    <lightning-card title="Routing Form Builder" icon-name="standard:form">
+        <div slot="actions">
+            <template lwc:if={isListView}>
+                <lightning-button label="New Form" variant="brand" onclick={handleNewFormClick}></lightning-button>
+            </template>
+            <template lwc:if={isDetailView}>
+                <lightning-button label="Back to List" onclick={handleBackToList}></lightning-button>
+            </template>
+        </div>
+
+        <template lwc:if={isLoading}>
+            <div class="slds-align_absolute-center slds-p-around_large">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template lwc:if={error}>
+            <div class="slds-p-around_medium">
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <h2>{error}</h2>
+                </div>
+            </div>
+        </template>
+
+        <template lwc:if={isListView}>
+            <div class="slds-p-around_medium">
+                <template lwc:if={hasForms}>
+                    <template for:each={forms} for:item="form">
+                        <div key={form.Id} class="slds-box slds-m-bottom_small">
+                            <div class="slds-grid slds-grid_align-spread">
+                                <div>
+                                    <h3 class="slds-text-heading_small">{form.Name}</h3>
+                                    <p class="slds-text-body_small slds-text-color_weak">{form.Description__c}</p>
+                                </div>
+                                <lightning-button label="Edit" variant="neutral" data-id={form.Id} onclick={handleEditFormClick}></lightning-button>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+
+                <template lwc:if={noForms}>
+                    <template lwc:if={notLoading}>
+                        <div class="slds-align_absolute-center slds-p-around_large">
+                            <p class="slds-text-color_weak">No routing forms configured. Create one to get started.</p>
+                        </div>
+                    </template>
+                </template>
+            </div>
+        </template>
+
+        <template lwc:if={isDetailView}>
+            <div class="slds-p-around_medium">
+                <div class="slds-box slds-m-bottom_medium">
+                    <h3 class="slds-text-heading_small slds-m-bottom_small">Form Details</h3>
+                    <lightning-input type="text" label="Form Name" value={editFormName} onchange={handleEditFormNameChange} required></lightning-input>
+                    <lightning-textarea label="Description" value={editFormDescription} onchange={handleEditFormDescriptionChange} class="slds-m-top_small"></lightning-textarea>
+                    <div class="slds-m-top_small">
+                        <lightning-button label="Save Details" variant="brand" onclick={handleSaveFormDetails}></lightning-button>
+                    </div>
+                </div>
+
+                <div class="slds-box slds-m-bottom_medium">
+                    <div class="slds-grid slds-grid_align-spread slds-m-bottom_small">
+                        <h3 class="slds-text-heading_small">Fields</h3>
+                        <lightning-button label="Add Field" variant="neutral" onclick={handleAddFieldClick}></lightning-button>
+                    </div>
+                    <template lwc:if={hasFields}>
+                        <table class="slds-table slds-table_cell-buffer">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Options</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={formDetail.fields} for:item="field">
+                                    <tr key={field.id}>
+                                        <td>{field.name}</td>
+                                        <td>{field.fieldType}</td>
+                                        <td>{field.options}</td>
+                                        <td>
+                                            <lightning-button label="Edit" variant="base" data-id={field.id} onclick={handleEditFieldClick}></lightning-button>
+                                            <lightning-button label="Delete" variant="base" data-id={field.id} onclick={handleDeleteField}></lightning-button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <template lwc:else>
+                        <p class="slds-text-color_weak">No fields yet.</p>
+                    </template>
+                </div>
+
+                <div class="slds-box">
+                    <div class="slds-grid slds-grid_align-spread slds-m-bottom_small">
+                        <h3 class="slds-text-heading_small">Routes</h3>
+                        <lightning-button label="Add Route" variant="neutral" onclick={handleAddRouteClick}></lightning-button>
+                    </div>
+                    <template lwc:if={hasRoutes}>
+                        <table class="slds-table slds-table_cell-buffer">
+                            <thead>
+                                <tr>
+                                    <th>Target Event Type</th>
+                                    <th>Condition</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={displayRoutes} for:item="route">
+                                    <tr key={route.id}>
+                                        <td>{route.targetEventTypeName}</td>
+                                        <td>{route.conditionSummary}</td>
+                                        <td>
+                                            <lightning-button label="Edit" variant="base" data-id={route.id} onclick={handleEditRouteClick}></lightning-button>
+                                            <lightning-button label="Delete" variant="base" data-id={route.id} onclick={handleDeleteRoute}></lightning-button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                    <template lwc:else>
+                        <p class="slds-text-color_weak">No routes yet.</p>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </lightning-card>
+
+    <template lwc:if={showNewFormModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleCancelNewForm} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">New Routing Form</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-input type="text" label="Form Name" onchange={handleNewFormNameChange} required></lightning-input>
+                    <lightning-textarea label="Description" onchange={handleNewFormDescriptionChange} class="slds-m-top_small"></lightning-textarea>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCancelNewForm}></lightning-button>
+                    <lightning-button label="Create" variant="brand" onclick={handleCreateForm}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <template lwc:if={showFieldModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleCancelField} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">{fieldModalTitle}</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-input type="text" label="Field Name" value={fieldName} onchange={handleFieldNameChange} required></lightning-input>
+                    <lightning-combobox label="Field Type" options={fieldTypeOptions} value={fieldType} onchange={handleFieldTypeChange} class="slds-m-top_small"></lightning-combobox>
+                    <template lwc:if={showFieldOptions}>
+                        <lightning-textarea label="Options (one per line or JSON array)" value={fieldOptions} onchange={handleFieldOptionsChange} class="slds-m-top_small"></lightning-textarea>
+                    </template>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCancelField}></lightning-button>
+                    <lightning-button label="Save" variant="brand" onclick={handleSaveField}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <template lwc:if={showRouteModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon icon-name="utility:close" onclick={handleCancelRoute} alternative-text="Close" class="slds-modal__close"></lightning-button-icon>
+                    <h2 class="slds-text-heading_medium">{routeModalTitle}</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-combobox label="Target Event Type" options={eventTypeOptions} value={routeTargetEventTypeId} onchange={handleRouteTargetChange} required></lightning-combobox>
+                    <h3 class="slds-text-heading_small slds-m-top_medium slds-m-bottom_x-small">Condition</h3>
+                    <lightning-combobox label="Field" options={conditionFieldOptions} value={routeConditionFieldId} onchange={handleRouteConditionFieldChange} placeholder="Always match (no condition)"></lightning-combobox>
+                    <lightning-combobox label="Operator" options={operatorOptions} value={routeConditionOperator} onchange={handleRouteConditionOperatorChange} class="slds-m-top_small"></lightning-combobox>
+                    <lightning-input type="text" label="Value" value={routeConditionValue} onchange={handleRouteConditionValueChange} class="slds-m-top_small"></lightning-input>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCancelRoute}></lightning-button>
+                    <lightning-button label="Save" variant="brand" onclick={handleSaveRoute}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>

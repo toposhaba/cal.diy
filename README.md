@@ -96,11 +96,40 @@ Base URL: `/services/apexrest/scheduling/v1`
 
 ## Experience Cloud
 
-1. Create a Digital Experience site and assign the **Scheduling_Booker** permission set to the guest user profile.
-2. Add the `calendarBooking` or `routingForm` component to a community page.
-3. Set the **Host User ID** design property to the Salesforce User Id of the host being booked.
+Scratch orgs include Communities and ExperienceBundle metadata support (`config/project-scratch-def.json`).
+
+### Create the site (CLI)
+
+```bash
+sf project deploy start --source-dir force-app
+sf org assign permset --name Scheduling_Host
+sf org assign permset --name Scheduling_Admin
+sf community create --name "Cal DIY Booking" --template-name "Build Your Own (LWR)" --url-path-prefix booking --description "Public scheduling"
+sf community publish --name "Cal DIY Booking"
+sf apex run --file scripts/create-community.apex
+```
+
+`scripts/create-community.apex` assigns **Scheduling_Booker** to active guest users after the site exists.
+
+### Builder setup
+
+1. Open the experience in Experience Builder.
+2. Add a page (or use flexipage **Scheduling_Community_Booking**) with the `calendarBooking` or `routingForm` component.
+3. Set **Host User ID** to the Salesforce User Id of the host being booked.
+4. Publish the site.
+
+CSP trusted sites for Stripe (`js.stripe.com`, `api.stripe.com`) deploy from `force-app/main/default/cspTrustedSites/`. Verify frame-src in Setup if the payment UI does not render.
 
 Routing forms are also available via `SchedulingController` Apex methods and the `routingForm` LWC.
+
+### E2E tests
+
+```bash
+export SF_FRONTDOOR_URL="$(sf org open --url-only --json | jq -r .result.url)"
+npm run test:e2e
+```
+
+Optional: `STRIPE_PUBLISHABLE_KEY` or `E2E_STRIPE_ENABLED=true` to run `payment-flow.spec.js`. Custom field tests skip when no booking field set is configured.
 
 ## Permission Sets
 

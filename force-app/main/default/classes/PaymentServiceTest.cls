@@ -79,6 +79,44 @@ private class PaymentServiceTest {
         }
     }
 
+    @IsTest
+    static void testGetPublishableKeyAndCheckoutInfo() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Checkout Event', 30);
+            eventType.Price__c = 15;
+            update eventType;
+
+            Booking__c booking = SchedulingTestDataFactory.createBooking(
+                eventType.Id,
+                testUser.Id,
+                Datetime.now().addDays(4),
+                Datetime.now().addDays(4).addMinutes(30)
+            );
+            booking.Status__c = 'Pending_Payment';
+            update booking;
+
+            Payment__c payment = new Payment__c(
+                Booking__c = booking.Id,
+                Amount__c = 15,
+                Currency_Code__c = 'USD',
+                Status__c = 'Pending',
+                External_Payment_Id__c = 'pi_checkout_123',
+                Provider__c = 'Stripe'
+            );
+            insert payment;
+
+            Test.startTest();
+            System.assertEquals(null, PaymentService.getPublishableKey());
+            PaymentService.PaymentCheckoutInfo info = PaymentService.getCheckoutInfo(booking.Id);
+            Test.stopTest();
+
+            System.assertEquals(payment.Id, info.paymentId);
+            System.assertEquals('pi_test_secret', info.clientSecret);
+        }
+    }
+
     private class StripePaymentIntentMock implements HttpCalloutMock {
         public HTTPResponse respond(HTTPRequest req) {
             HttpResponse res = new HttpResponse();

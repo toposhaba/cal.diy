@@ -17,6 +17,8 @@
     <tabs>Calendar_Booking</tabs>
     <tabs>Calendar_Connections</tabs>
     <tabs>Schedule_Manager</tabs>
+    <tabs>routingFormBuilder</tabs>
+    <tabs>workflowBuilder</tabs>
     <tabs>Routing_Booking</tabs>
     <tabs>Booking__c</tabs>
     <tabs>Event_Type__c</tabs>

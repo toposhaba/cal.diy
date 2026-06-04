@@ -135,7 +135,8 @@ export default class BookingManager extends LightningElement {
             this.rescheduleSlots = await getAvailableSlots({
                 eventTypeId: this.rescheduleBooking.Event_Type__c,
                 startDateStr: this.rescheduleDate,
-                endDateStr: this.rescheduleDate
+                endDateStr: this.rescheduleDate,
+                durationMinutes: null
             });
         } catch (err) {
             this.error = this.extractError(err);

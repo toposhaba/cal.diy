@@ -1,5 +1,60 @@
 public with sharing class PaymentService {
 
+    public class PaymentCheckoutInfo {
+        @AuraEnabled public Id paymentId { get; set; }
+        @AuraEnabled public String clientSecret { get; set; }
+        @AuraEnabled public String publishableKey { get; set; }
+    }
+
+    public static PaymentCheckoutInfo getCheckoutInfo(Id bookingId) {
+        Payment__c payment = [
+            SELECT Id, External_Payment_Id__c
+            FROM Payment__c
+            WHERE Booking__c = :bookingId AND Status__c = 'Pending'
+            WITH USER_MODE
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+
+        if (payment == null) {
+            payment = createPaymentIntent(bookingId);
+        }
+
+        PaymentCheckoutInfo info = new PaymentCheckoutInfo();
+        info.paymentId = payment.Id;
+        info.publishableKey = getPublishableKey();
+
+        if (Test.isRunningTest()) {
+            info.clientSecret = 'pi_test_secret';
+            return info;
+        }
+
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint('callout:Stripe_API/payment_intents/' +
+            EncodingUtil.urlEncode(payment.External_Payment_Id__c, 'UTF-8'));
+        req.setMethod('GET');
+        req.setTimeout(15000);
+
+        HttpResponse res = new Http().send(req);
+        if (res.getStatusCode() != 200) {
+            throw new SchedulingException('STRIPE_ERROR', 'Unable to load payment details');
+        }
+
+        Map<String, Object> response = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        info.clientSecret = (String) response.get('client_secret');
+        return info;
+    }
+
+    public static String getPublishableKey() {
+        Scheduling_Settings__mdt settings = Scheduling_Settings__mdt.getInstance('Default');
+        return settings != null ? settings.Stripe_Publishable_Key__c : null;
+    }
+
+    public static String getWebhookSecret() {
+        Scheduling_Settings__mdt settings = Scheduling_Settings__mdt.getInstance('Default');
+        return settings != null ? settings.Stripe_Webhook_Secret__c : null;
+    }
+
     public static Payment__c createPaymentIntent(Id bookingId) {
         Booking__c booking = [
             SELECT Id, Event_Type__c, Event_Type__r.Price__c, Booker_Email__c

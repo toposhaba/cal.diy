@@ -133,4 +133,39 @@
         </section>
         <div class="slds-backdrop slds-backdrop_open"></div>
     </template>
+
+    <div class="slds-p-around_medium slds-border_top">
+        <div class="slds-grid slds-grid_align-spread slds-m-bottom_small">
+            <h2 class="slds-text-heading_small">Travel Schedules</h2>
+            <lightning-button label="Add Travel Period" variant="neutral" onclick={handleAddTravelClick}></lightning-button>
+        </div>
+        <template for:each={travelSchedules} for:item="travel">
+            <div key={travel.Id} class="slds-box slds-m-bottom_x-small">
+                <p class="slds-text-body_regular">{travel.Name}</p>
+                <p class="slds-text-body_small slds-text-color_weak">
+                    {travel.Start_Date__c} to {travel.End_Date__c} ({travel.Time_Zone__c})
+                </p>
+            </div>
+        </template>
+    </div>
+
+    <template lwc:if={showAddTravelForm}>
+        <section role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <h2 class="slds-text-heading_medium">Add Travel Schedule</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-input type="date" label="Start Date" value={newTravelStartDate} onchange={handleTravelStartChange} required></lightning-input>
+                    <lightning-input type="date" label="End Date" value={newTravelEndDate} onchange={handleTravelEndChange} class="slds-m-top_small" required></lightning-input>
+                    <lightning-combobox label="Time Zone" value={newTravelTimeZone} options={timezoneOptions} onchange={handleTravelTimeZoneChange} class="slds-m-top_small" required></lightning-combobox>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCancelAddTravel}></lightning-button>
+                    <lightning-button label="Save" variant="brand" onclick={handleCreateTravelSchedule}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
 </template>

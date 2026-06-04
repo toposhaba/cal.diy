@@ -32,9 +32,31 @@ public with sharing class AvailabilityService {
         return schedules[0];
     }
 
+    public static List<Integer> resolveDurations(Event_Type__c eventType) {
+        if (String.isNotBlank(eventType.Multiple_Durations__c)) {
+            List<Integer> durations = new List<Integer>();
+            for (String part : eventType.Multiple_Durations__c.split(',')) {
+                String trimmed = part.trim();
+                if (String.isNotBlank(trimmed)) {
+                    durations.add(Integer.valueOf(trimmed));
+                }
+            }
+            if (!durations.isEmpty()) {
+                return durations;
+            }
+        }
+        return new List<Integer>{ (Integer) eventType.Duration_Minutes__c };
+    }
+
     public static List<TimeSlot> getAvailableSlots(Id eventTypeId, Date startDate, Date endDate) {
+        return getAvailableSlots(eventTypeId, startDate, endDate, null);
+    }
+
+    public static List<TimeSlot> getAvailableSlots(
+        Id eventTypeId, Date startDate, Date endDate, Integer durationMinutes
+    ) {
         List<Event_Type__c> eventTypes = [
-            SELECT Id, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
+            SELECT Id, Duration_Minutes__c, Multiple_Durations__c, Min_Booking_Notice_Minutes__c,
                    Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
                    Slot_Interval_Minutes__c, Booking_Window_Days__c,
                    Owner_User__c, OwnerId, Schedule__c, Scheduling_Type__c
@@ -54,13 +76,13 @@ public with sharing class AvailabilityService {
         if (schedulingType == 'Collective') {
             return SeatedBookingService.enrichSlotsWithSeatAvailability(
                 eventTypeId,
-                TeamSchedulingService.getCollectiveAvailableSlots(eventTypeId, startDate, endDate)
+                TeamSchedulingService.getCollectiveAvailableSlots(eventTypeId, startDate, endDate, durationMinutes)
             );
         }
         if (schedulingType == 'Round_Robin') {
             return SeatedBookingService.enrichSlotsWithSeatAvailability(
                 eventTypeId,
-                TeamSchedulingService.getRoundRobinAvailableSlots(eventTypeId, startDate, endDate)
+                TeamSchedulingService.getRoundRobinAvailableSlots(eventTypeId, startDate, endDate, durationMinutes)
             );
         }
 
@@ -70,13 +92,21 @@ public with sharing class AvailabilityService {
         }
         return SeatedBookingService.enrichSlotsWithSeatAvailability(
             eventTypeId,
-            getAvailableSlotsForHost(eventTypeId, hosts[0], startDate, endDate)
+            getAvailableSlotsForHost(eventTypeId, hosts[0], startDate, endDate, durationMinutes)
         );
     }
 
-    public static List<TimeSlot> getAvailableSlotsForHost(Id eventTypeId, Id hostUserId, Date startDate, Date endDate) {
+    public static List<TimeSlot> getAvailableSlotsForHost(
+        Id eventTypeId, Id hostUserId, Date startDate, Date endDate
+    ) {
+        return getAvailableSlotsForHost(eventTypeId, hostUserId, startDate, endDate, null);
+    }
+
+    public static List<TimeSlot> getAvailableSlotsForHost(
+        Id eventTypeId, Id hostUserId, Date startDate, Date endDate, Integer durationMinutes
+    ) {
         List<Event_Type__c> eventTypes = [
-            SELECT Id, Duration_Minutes__c, Min_Booking_Notice_Minutes__c,
+            SELECT Id, Duration_Minutes__c, Multiple_Durations__c, Min_Booking_Notice_Minutes__c,
                    Buffer_Before_Minutes__c, Buffer_After_Minutes__c,
                    Slot_Interval_Minutes__c, Booking_Window_Days__c,
                    Owner_User__c, OwnerId, Schedule__c, Seats_Per_Slot__c
@@ -109,6 +139,15 @@ public with sharing class AvailabilityService {
         String scheduleTimeZone = String.isNotBlank(schedule.Time_Zone__c)
             ? schedule.Time_Zone__c : UserInfo.getTimeZone().getID();
 
+        List<Travel_Schedule__c> travelSchedules = [
+            SELECT Start_Date__c, End_Date__c, Time_Zone__c
+            FROM Travel_Schedule__c
+            WHERE User__c = :hostUserId
+                AND Start_Date__c <= :endDate
+                AND End_Date__c >= :startDate
+            WITH USER_MODE
+        ];
+
         List<Availability__c> availabilities = [
             SELECT Id, Record_Type__c, Days__c, Start_Time__c, End_Time__c, Override_Date__c
             FROM Availability__c
@@ -139,9 +178,31 @@ public with sharing class AvailabilityService {
             System.debug(LoggingLevel.WARN, 'External calendar check failed: ' + e.getMessage());
         }
 
-        List<TimeSlot> slots = calculateSlots(
-            eventType, availabilities, existingBookings, externalBusy, startDate, endDate, scheduleTimeZone
-        );
+        List<Integer> durations = resolveDurations(eventType);
+        List<TimeSlot> slots = new List<TimeSlot>();
+        if (durationMinutes != null) {
+            slots = calculateSlots(
+                eventType, availabilities, existingBookings, externalBusy,
+                startDate, endDate, scheduleTimeZone, travelSchedules, durationMinutes
+            );
+        } else if (durations.size() == 1) {
+            slots = calculateSlots(
+                eventType, availabilities, existingBookings, externalBusy,
+                startDate, endDate, scheduleTimeZone, travelSchedules, durations[0]
+            );
+        } else {
+            Map<String, TimeSlot> slotMap = new Map<String, TimeSlot>();
+            for (Integer duration : durations) {
+                for (TimeSlot slot : calculateSlots(
+                    eventType, availabilities, existingBookings, externalBusy,
+                    startDate, endDate, scheduleTimeZone, travelSchedules, duration
+                )) {
+                    slotMap.put(buildSlotKey(slot.startTime, slot.endTime), slot);
+                }
+            }
+            slots = slotMap.values();
+            slots.sort(new TimeSlotComparator());
+        }
 
         List<TimeSlot> availableSlots = new List<TimeSlot>();
         for (TimeSlot slot : slots) {
@@ -152,6 +213,22 @@ public with sharing class AvailabilityService {
         return availableSlots;
     }
 
+    private static String buildSlotKey(Datetime startTime, Datetime endTime) {
+        return String.valueOf(startTime.getTime()) + ':' + String.valueOf(endTime.getTime());
+    }
+
+    private static String resolveTimeZoneForDate(
+        Date targetDate, String defaultTimeZone, List<Travel_Schedule__c> travelSchedules
+    ) {
+        for (Travel_Schedule__c travel : travelSchedules) {
+            if (travel.Start_Date__c <= targetDate && travel.End_Date__c >= targetDate
+                && String.isNotBlank(travel.Time_Zone__c)) {
+                return travel.Time_Zone__c;
+            }
+        }
+        return defaultTimeZone;
+    }
+
     private static List<TimeSlot> calculateSlots(
         Event_Type__c eventType,
         List<Availability__c> availabilities,
@@ -159,10 +236,11 @@ public with sharing class AvailabilityService {
         List<CalendarIntegrationService.BusySlot> externalBusy,
         Date startDate,
         Date endDate,
-        String scheduleTimeZone
+        String scheduleTimeZone,
+        List<Travel_Schedule__c> travelSchedules,
+        Integer durationMinutes
     ) {
         List<TimeSlot> slots = new List<TimeSlot>();
-        Integer durationMinutes = (Integer)eventType.Duration_Minutes__c;
         Integer slotInterval = eventType.Slot_Interval_Minutes__c != null
             ? (Integer)eventType.Slot_Interval_Minutes__c
             : durationMinutes;
@@ -177,12 +255,13 @@ public with sharing class AvailabilityService {
         Integer bookingWindowDays = eventType.Booking_Window_Days__c != null
             ? (Integer)eventType.Booking_Window_Days__c : 60;
         Date maxBookableDate = Date.today().addDays(bookingWindowDays);
-        TimeZone scheduleTz = TimeZone.getTimeZone(scheduleTimeZone);
         TimeZone userTz = UserInfo.getTimeZone();
 
         Date effectiveEnd = endDate < maxBookableDate ? endDate : maxBookableDate;
         Date currentDate = startDate;
         while (currentDate <= effectiveEnd) {
+            String dayTimeZone = resolveTimeZoneForDate(currentDate, scheduleTimeZone, travelSchedules);
+            TimeZone scheduleTz = TimeZone.getTimeZone(dayTimeZone);
             String dayName = getDayName(currentDate, scheduleTz);
             List<Availability__c> applicableWindows = getApplicableWindows(availabilities, currentDate, dayName);
 
