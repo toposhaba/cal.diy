@@ -1,0 +1,64 @@
+<template>
+    <lightning-card title={cardTitle} icon-name="standard:event">
+        <div slot="actions">
+            <lightning-button-icon
+                icon-name="utility:refresh"
+                onclick={handleRefresh}
+                alternative-text="Refresh">
+            </lightning-button-icon>
+        </div>
+
+        <div class="slds-p-around_medium">
+            <template lwc:if={isLoading}>
+                <div class="slds-align_absolute-center slds-p-around_large">
+                    <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                </div>
+            </template>
+
+            <template lwc:if={error}>
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <h2>{error}</h2>
+                </div>
+            </template>
+
+            <template lwc:if={hasBookings}>
+                <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                    <thead>
+                        <tr class="slds-line-height_reset">
+                            <th scope="col"><div class="slds-truncate">Title</div></th>
+                            <th scope="col"><div class="slds-truncate">When</div></th>
+                            <th scope="col"><div class="slds-truncate">Booker</div></th>
+                            <th scope="col"><div class="slds-truncate">Status</div></th>
+                            <th scope="col"><div class="slds-truncate">Actions</div></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={formattedBookings} for:item="booking">
+                            <tr key={booking.id}>
+                                <td><div class="slds-truncate">{booking.title}</div></td>
+                                <td><div class="slds-truncate">{booking.whenDisplay}</div></td>
+                                <td><div class="slds-truncate">{booking.bookerDisplay}</div></td>
+                                <td><span class={booking.statusClass}>{booking.status}</span></td>
+                                <td>
+                                    <lightning-button
+                                        label="View"
+                                        variant="base"
+                                        size="small"
+                                        data-id={booking.id}
+                                        onclick={handleViewBooking}>
+                                    </lightning-button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+
+            <template lwc:if={showEmptyState}>
+                <div class="slds-align_absolute-center slds-p-around_large">
+                    <p class="slds-text-color_weak">{emptyMessage}</p>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

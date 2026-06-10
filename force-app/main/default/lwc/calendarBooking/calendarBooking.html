@@ -1,5 +1,11 @@
 <template>
-    <lightning-card title="Book a Meeting" icon-name="standard:event">
+    <div class={shellClass}>
+        <template lwc:if={showShellHeader}>
+            <div class="slds-grid slds-grid_vertical-align-center slds-m-bottom_small shell-header">
+                <lightning-icon icon-name="standard:event" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                <h2 class="slds-text-heading_small">Book a Meeting</h2>
+            </div>
+        </template>
         <template lwc:if={isLoading}>
             <div class="slds-align_absolute-center slds-p-around_large">
                 <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
@@ -177,6 +183,7 @@
                                     label={field.label}
                                     placeholder="Search contacts..."
                                     object-api-name="Contact"
+                                    value={field.value}
                                     data-field={field.apiName}
                                     onchange={handleContactSelect}
                                 ></lightning-record-picker>
@@ -283,6 +290,28 @@
                     </lightning-input>
                 </template>
 
+                <template lwc:if={showLocationSection}>
+                    <div class="slds-m-top_medium slds-m-bottom_small">
+                        <lightning-radio-group
+                            label="Meeting location"
+                            options={locationTypeOptions}
+                            value={locationType}
+                            type="radio"
+                            onchange={handleLocationTypeChange}
+                        ></lightning-radio-group>
+                        <template lwc:if={isInPersonLocation}>
+                            <div class="slds-m-top_small">
+                                <c-location-lookup
+                                    label="Address"
+                                    value={locationAddress}
+                                    api-key={googlePlacesApiKey}
+                                    onlocationchange={handleLocationChange}
+                                ></c-location-lookup>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
                 <div class="slds-m-top_medium">
                     <lightning-input type="checkbox" label="Book as recurring series" checked={isRecurring} onchange={handleRecurringChange}></lightning-input>
                 </div>
@@ -327,6 +356,18 @@
                         <p class="slds-m-top_small slds-text-body_small">
                             Reference: {confirmedBooking.UID__c}
                         </p>
+                        <template lwc:if={hasMeetingLink}>
+                            <p class="slds-m-top_x-small slds-text-body_small">
+                                Meeting link: {confirmedBooking.Location__c}
+                            </p>
+                        </template>
+                        <template lwc:if={isInPersonLocation}>
+                            <template lwc:if={locationAddress}>
+                                <p class="slds-m-top_x-small slds-text-body_small">
+                                    Location: {locationAddress}
+                                </p>
+                            </template>
+                        </template>
                     </template>
                     <template lwc:if={isPendingPayment}>
                         <p class="slds-m-top_small slds-text-body_small">Complete payment to confirm your booking.</p>
@@ -341,5 +382,5 @@
                 </div>
             </div>
         </template>
-    </lightning-card>
+    </div>
 </template>

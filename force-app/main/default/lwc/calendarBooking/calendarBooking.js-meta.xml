@@ -13,6 +13,7 @@
     <targetConfigs>
         <targetConfig targets="lightning__AppPage,lightning__RecordPage,lightning__HomePage">
             <property name="hostUserId" type="String" label="Host User ID" description="ID of the host user whose calendar to show. Leave blank for current user." />
+            <property name="compact" type="Boolean" label="Compact Mode" description="Use compact layout for utility bar panels." default="false" />
         </targetConfig>
         <targetConfig targets="lightningCommunity__Default">
             <property name="hostUserId" type="String" label="Host User ID" description="Salesforce User Id of the host being booked." required="true" />

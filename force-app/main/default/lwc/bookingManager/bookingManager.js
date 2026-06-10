@@ -12,6 +12,8 @@ export default class BookingManager extends LightningElement {
     @track error;
     @track startDate;
     @track endDate;
+    @track searchTerm = '';
+    searchDebounceTimeout;
     @track selectedBookingId;
     @track showCancelModal = false;
     @track cancelReason = '';
@@ -56,6 +58,18 @@ export default class BookingManager extends LightningElement {
     handleEndDateChange(event) {
         this.endDate = event.target.value;
         this.loadBookings();
+    }
+
+    handleSearchChange(event) {
+        this.searchTerm = event.target.value;
+        clearTimeout(this.searchDebounceTimeout);
+        this.searchDebounceTimeout = setTimeout(() => {
+            this.loadBookings();
+        }, 300);
+    }
+
+    disconnectedCallback() {
+        clearTimeout(this.searchDebounceTimeout);
     }
 
     handleConfirm(event) {
@@ -213,6 +227,13 @@ export default class BookingManager extends LightningElement {
 
     get noBookings() {
         return !this.hasBookings;
+    }
+
+    get emptyMessage() {
+        if (this.searchTerm && this.searchTerm.trim()) {
+            return 'No bookings match your search.';
+        }
+        return 'No bookings found for this period.';
     }
 
     get notLoading() {

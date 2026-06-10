@@ -28,6 +28,7 @@ public with sharing class BookingService {
         validateSlotAvailability(eventType, hostUserId, request.startDateTime, slotEnd, null);
 
         String status = resolveInitialStatus(eventType);
+        Boolean isVirtual = isVirtualProvider(request.videoProvider);
 
         Booking__c booking = new Booking__c(
             UID__c = generateUID(),
@@ -37,7 +38,8 @@ public with sharing class BookingService {
             Start_DateTime__c = request.startDateTime,
             End_DateTime__c = slotEnd,
             Status__c = status,
-            Location__c = eventType.Location__c,
+            Location__c = isVirtual ? null : resolveBookingLocation(request.location, eventType.Location__c),
+            Video_Provider__c = isVirtual ? request.videoProvider : null,
             Booker_Email__c = request.bookerEmail,
             Booker_Name__c = request.bookerName
         );
@@ -195,8 +197,35 @@ public with sharing class BookingService {
     }
 
     public static List<Booking__c> getBookingsForHost(Id hostUserId, Date startDate, Date endDate) {
+        return getBookingsForHost(hostUserId, startDate, endDate, null);
+    }
+
+    public static List<Booking__c> getBookingsForHost(
+        Id hostUserId,
+        Date startDate,
+        Date endDate,
+        String searchTerm
+    ) {
         Datetime rangeStart = Datetime.newInstance(startDate, Time.newInstance(0, 0, 0, 0));
         Datetime rangeEnd = Datetime.newInstance(endDate, Time.newInstance(23, 59, 59, 0));
+        String sanitizedSearch = sanitizeSearchTerm(searchTerm);
+
+        if (String.isBlank(sanitizedSearch)) {
+            return [
+                SELECT Id, UID__c, Title__c, Start_DateTime__c, End_DateTime__c,
+                       Status__c, Location__c, Booker_Email__c, Booker_Name__c,
+                       Event_Type__c, Event_Type__r.Name, Event_Type__r.Duration_Minutes__c,
+                       Event_Type__r.Disable_Cancellation__c, Recurring_Pattern__c
+                FROM Booking__c
+                WHERE Host__c = :hostUserId
+                    AND Start_DateTime__c < :rangeEnd
+                    AND End_DateTime__c > :rangeStart
+                WITH USER_MODE
+                ORDER BY Start_DateTime__c ASC
+            ];
+        }
+
+        String likePattern = '%' + sanitizedSearch + '%';
         return [
             SELECT Id, UID__c, Title__c, Start_DateTime__c, End_DateTime__c,
                    Status__c, Location__c, Booker_Email__c, Booker_Name__c,
@@ -206,9 +235,19 @@ public with sharing class BookingService {
             WHERE Host__c = :hostUserId
                 AND Start_DateTime__c < :rangeEnd
                 AND End_DateTime__c > :rangeStart
+                AND (Title__c LIKE :likePattern
+                    OR Booker_Name__c LIKE :likePattern
+                    OR Booker_Email__c LIKE :likePattern)
             WITH USER_MODE
             ORDER BY Start_DateTime__c ASC
         ];
+    }
+
+    private static String sanitizeSearchTerm(String searchTerm) {
+        if (String.isBlank(searchTerm)) {
+            return null;
+        }
+        return searchTerm.trim().replace('%', '').replace('_', '');
     }
 
     private static void validateBookingRequest(BookingRequest request) {
@@ -290,6 +329,8 @@ public with sharing class BookingService {
             validateMinNotice(eventType, request.startDateTime);
         }
 
+        Boolean shellExisted = !existingShells.isEmpty();
+
         Booking__c shell = SeatedBookingService.findOrCreateSeatedBooking(
             eventType.Id,
             hostUserId,
@@ -298,6 +339,10 @@ public with sharing class BookingService {
             request.bookerEmail
         );
         SeatedBookingService.reserveSeat(shell.Id, request.bookerName, request.bookerEmail);
+
+        if (shellExisted) {
+            BookingNotificationService.sendSeatConfirmation(shell.Id, request.bookerEmail, request.bookerName);
+        }
 
         List<Booking__c> results = [
             SELECT Id, UID__c, Title__c, Start_DateTime__c, End_DateTime__c,
@@ -418,11 +463,21 @@ public with sharing class BookingService {
                hex.substring(20, 32);
     }
 
+    private static Boolean isVirtualProvider(String videoProvider) {
+        return String.isNotBlank(videoProvider) && videoProvider != 'None';
+    }
+
+    private static String resolveBookingLocation(String requestLocation, String eventTypeLocation) {
+        return String.isNotBlank(requestLocation) ? requestLocation : eventTypeLocation;
+    }
+
     public class BookingRequest {
         @AuraEnabled public Id eventTypeId { get; set; }
         @AuraEnabled public Datetime startDateTime { get; set; }
         @AuraEnabled public String bookerEmail { get; set; }
         @AuraEnabled public String bookerName { get; set; }
         @AuraEnabled public List<String> attendeeEmails { get; set; }
+        @AuraEnabled public String location { get; set; }
+        @AuraEnabled public String videoProvider { get; set; }
     }
 }

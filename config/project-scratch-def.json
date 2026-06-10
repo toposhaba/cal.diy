@@ -1,6 +1,7 @@
 {
   "orgName": "Cal DIY Dev",
   "edition": "Developer",
+  "durationDays": 30,
   "features": [
     "EnableSetPasswordInApi",
     "Communities",
@@ -19,6 +20,13 @@
     },
     "experienceBundleSettings": {
       "enableExperienceBundleMetadata": true
+    },
+    "emailAdministrationSettings": {
+      "enableEnhancedEmailEnabled": true,
+      "enableEmailSpfCompliance": false
+    },
+    "emailAuthorizationSettings": {
+      "enableSubstituteFromAddress": true
     }
   }
 }

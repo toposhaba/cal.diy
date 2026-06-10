@@ -10,4 +10,32 @@
         <field>Stripe_Webhook_Secret__c</field>
         <value xsi:type="xsd:string"></value>
     </values>
+    <values>
+        <field>Google_Places_API_Key__c</field>
+        <value xsi:type="xsd:string"></value>
+    </values>
+    <values>
+        <field>Workday_Tenant_URL__c</field>
+        <value xsi:type="xsd:string"></value>
+    </values>
+    <values>
+        <field>Workday_Absence_Report_Path__c</field>
+        <value xsi:type="xsd:string"></value>
+    </values>
+    <values>
+        <field>Workday_Schedule_Report_Path__c</field>
+        <value xsi:type="xsd:string"></value>
+    </values>
+    <values>
+        <field>Workday_Sync_Days_Ahead__c</field>
+        <value xsi:type="xsd:double">90.0</value>
+    </values>
+    <values>
+        <field>Zoom_Account_Id__c</field>
+        <value xsi:type="xsd:string">AknhOyhtQSm9tdP_EqHdNw</value>
+    </values>
+    <values>
+        <field>Zoom_User_Id__c</field>
+        <value xsi:type="xsd:string"></value>
+    </values>
 </CustomMetadata>

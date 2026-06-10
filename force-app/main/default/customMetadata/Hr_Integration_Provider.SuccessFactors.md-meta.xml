@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>SuccessFactors</label>
+    <protected>false</protected>
+    <values>
+        <field>Provider_Key__c</field>
+        <value xsi:type="xsd:string">SuccessFactors</value>
+    </values>
+    <values>
+        <field>Is_Enabled__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Is_Implemented__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Setup_Guidance__c</field>
+        <value xsi:type="xsd:string">Coming soon. SAP SuccessFactors OData APIs cover employee time events and work schedules for SAP-centric enterprises.</value>
+    </values>
+</CustomMetadata>

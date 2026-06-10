@@ -1,4 +1,7 @@
-import { LightningElement, api, track } from 'lwc';
+import { LightningElement, api, track, wire } from 'lwc';
+import { getRecord } from 'lightning/uiRecordApi';
+import CONTACT_NAME_FIELD from '@salesforce/schema/Contact.Name';
+import CONTACT_EMAIL_FIELD from '@salesforce/schema/Contact.Email';
 import getActiveEventTypes from '@salesforce/apex/SchedulingController.getActiveEventTypes';
 import getAvailableSlots from '@salesforce/apex/SchedulingController.getAvailableSlots';
 import getEventTypeDurations from '@salesforce/apex/SchedulingController.getEventTypeDurations';
@@ -10,9 +13,11 @@ import createRecurringSeries from '@salesforce/apex/SchedulingController.createR
 import getPaymentCheckoutInfo from '@salesforce/apex/SchedulingController.getPaymentCheckoutInfo';
 import completePayment from '@salesforce/apex/SchedulingController.completePayment';
 import getBookingFormFields from '@salesforce/apex/SchedulingController.getBookingFormFields';
+import getBookingLocationSettings from '@salesforce/apex/SchedulingController.getBookingLocationSettings';
 
 export default class CalendarBooking extends LightningElement {
     @api hostUserId;
+    @api compact = false;
     @track eventTypes = [];
     @track availableSlots = [];
     @track selectedEventType;
@@ -36,6 +41,26 @@ export default class CalendarBooking extends LightningElement {
     @track customFieldValues = {};
     @track paymentCheckoutInfo;
     @track bookerPhone = '';
+    @track selectedContactId;
+    @track locationType = 'in_person';
+    @track locationAddress = '';
+    @track googlePlacesApiKey;
+    @track videoOptions = [];
+    @track showLocationSection = false;
+
+    @wire(getRecord, { recordId: '$selectedContactId', fields: [CONTACT_NAME_FIELD, CONTACT_EMAIL_FIELD] })
+    wiredBookerContact({ error, data }) {
+        if (!this.selectedContactId) {
+            return;
+        }
+        if (data) {
+            const name = data.fields.Name.value || '';
+            const email = data.fields.Email.value || '';
+            this.applyBookerContactDetails(name, email, this.selectedContactId);
+        } else if (error) {
+            this.error = this.extractError(error);
+        }
+    }
 
     connectedCallback() {
         this.loadEventTypes();
@@ -52,6 +77,14 @@ export default class CalendarBooking extends LightningElement {
 
     get hasFieldSet() {
         return this.formFields && this.formFields.length > 0;
+    }
+
+    get showShellHeader() {
+        return !this.compact;
+    }
+
+    get shellClass() {
+        return this.compact ? 'compact-shell' : 'full-shell';
     }
 
     get hasCustomBookingFields() {
@@ -93,21 +126,49 @@ export default class CalendarBooking extends LightningElement {
     }
 
     get renderableFields() {
-        return this.formFields.map(f => ({
-            ...f,
-            isLookup: f.type === 'REFERENCE',
-            isEmail: f.type === 'EMAIL',
-            isText: f.type === 'STRING' || f.type === 'TEXT',
-            isTextArea: f.type === 'TEXTAREA',
-            isPhone: f.type === 'PHONE',
-            isNumber: f.type === 'DOUBLE' || f.type === 'INTEGER' || f.type === 'CURRENCY',
-            isCheckbox: f.type === 'BOOLEAN',
-            isDate: f.type === 'DATE',
-            isDateTime: f.type === 'DATETIME',
-            isContactLookup: f.apiName === 'Booker_Contact__c',
-            isRequired: f.required === 'true',
-            value: this.fieldValues[f.apiName] || ''
-        }));
+        return this.formFields
+            .filter(f => f.apiName !== 'Location__c')
+            .map(f => ({
+                ...f,
+                isLookup: f.type === 'REFERENCE',
+                isEmail: f.type === 'EMAIL',
+                isText: f.type === 'STRING' || f.type === 'TEXT',
+                isTextArea: f.type === 'TEXTAREA',
+                isPhone: f.type === 'PHONE',
+                isNumber: f.type === 'DOUBLE' || f.type === 'INTEGER' || f.type === 'CURRENCY',
+                isCheckbox: f.type === 'BOOLEAN',
+                isDate: f.type === 'DATE',
+                isDateTime: f.type === 'DATETIME',
+                isContactLookup: f.apiName === 'Booker_Contact__c',
+                isRequired: f.required === 'true',
+                value: this.fieldValues[f.apiName] || ''
+            }));
+    }
+
+    get locationTypeOptions() {
+        const options = [{ label: 'In person', value: 'in_person' }];
+        (this.videoOptions || []).forEach(option => {
+            options.push({ label: option.label, value: option.value });
+        });
+        return options;
+    }
+
+    get isInPersonLocation() {
+        return this.locationType === 'in_person';
+    }
+
+    get selectedVideoProvider() {
+        return this.isInPersonLocation ? null : this.locationType;
+    }
+
+    get bookingLocation() {
+        return this.isInPersonLocation ? this.locationAddress : null;
+    }
+
+    get hasMeetingLink() {
+        return this.confirmedBooking
+            && this.confirmedBooking.Location__c
+            && this.confirmedBooking.Location__c.startsWith('http');
     }
 
     handleFieldChange(event) {
@@ -122,8 +183,26 @@ export default class CalendarBooking extends LightningElement {
     }
 
     handleContactSelect(event) {
-        const selectedId = event.detail.value && event.detail.value.length > 0 ? event.detail.value[0] : null;
-        this.fieldValues = { ...this.fieldValues, Booker_Contact__c: selectedId };
+        const selectedId = event.detail.recordId || null;
+
+        if (!selectedId) {
+            this.selectedContactId = undefined;
+            this.applyBookerContactDetails('', '', null);
+            return;
+        }
+
+        this.selectedContactId = selectedId;
+    }
+
+    applyBookerContactDetails(name, email, contactId) {
+        this.bookerName = name;
+        this.bookerEmail = email;
+        this.fieldValues = {
+            ...this.fieldValues,
+            Booker_Contact__c: contactId,
+            Booker_Name__c: name,
+            Booker_Email__c: email
+        };
     }
 
     async loadEventTypes() {
@@ -222,10 +301,49 @@ export default class CalendarBooking extends LightningElement {
         }
     }
 
-    handleSlotSelect(event) {
+    async handleSlotSelect(event) {
         const slotIndex = parseInt(event.currentTarget.dataset.index, 10);
         this.selectedSlot = this.availableSlots[slotIndex];
         this.currentStep = 'booking-form';
+        await this.loadLocationSettings();
+    }
+
+    async loadLocationSettings() {
+        if (!this.selectedEventType) {
+            return;
+        }
+
+        try {
+            const settings = await getBookingLocationSettings({
+                hostUserId: this.hostUserId || this.selectedEventType.Owner_User__c,
+                eventTypeId: this.selectedEventType.Id
+            });
+
+            this.googlePlacesApiKey = settings.googlePlacesApiKey;
+            this.videoOptions = settings.videoOptions || [];
+            this.showLocationSection = true;
+            this.locationAddress = settings.defaultLocation || this.selectedEventType.Location__c || '';
+
+            if (settings.defaultVideoProvider) {
+                this.locationType = settings.defaultVideoProvider;
+            } else {
+                this.locationType = 'in_person';
+            }
+        } catch (err) {
+            this.showLocationSection = true;
+            this.videoOptions = [];
+            this.locationType = 'in_person';
+            this.locationAddress = this.selectedEventType.Location__c || '';
+        }
+    }
+
+    handleLocationTypeChange(event) {
+        this.locationType = event.detail.value;
+    }
+
+    handleLocationChange(event) {
+        this.locationAddress = event.detail.value;
+        this.fieldValues = { ...this.fieldValues, Location__c: event.detail.value };
     }
 
     handleNameChange(event) {
@@ -261,7 +379,9 @@ export default class CalendarBooking extends LightningElement {
                     bookerEmail: this.bookerEmail,
                     bookerName: this.bookerName,
                     bookerPhone: this.bookerPhone,
-                    customFieldResponses: this.customFieldValues
+                    customFieldResponses: this.customFieldValues,
+                    location: this.bookingLocation,
+                    videoProvider: this.selectedVideoProvider
                 });
             } else if (this.hasFieldSet) {
                 const values = { ...this.fieldValues };
@@ -270,7 +390,9 @@ export default class CalendarBooking extends LightningElement {
                 this.confirmedBooking = await createBookingWithFields({
                     eventTypeId: this.selectedEventType.Id,
                     startDateTimeStr: this.selectedSlot.startTime,
-                    fieldValues: values
+                    fieldValues: values,
+                    location: this.bookingLocation,
+                    videoProvider: this.selectedVideoProvider
                 });
             } else if (this.isRecurring) {
                 const bookings = await createRecurringSeries({
@@ -289,11 +411,14 @@ export default class CalendarBooking extends LightningElement {
                     startDateTimeStr: this.selectedSlot.startTime,
                     bookerEmail: this.bookerEmail,
                     bookerName: this.bookerName,
-                    attendeeEmails: []
+                    attendeeEmails: [],
+                    location: this.bookingLocation,
+                    videoProvider: this.selectedVideoProvider
                 });
             }
             this.bookingConfirmed = true;
             this.currentStep = 'confirmation';
+            this.dispatchEvent(new CustomEvent('bookingcomplete', { bubbles: true, composed: true }));
 
             if (this.isPendingPayment && this.confirmedBooking) {
                 this.paymentCheckoutInfo = await getPaymentCheckoutInfo({ bookingId: this.confirmedBooking.Id });
@@ -333,6 +458,8 @@ export default class CalendarBooking extends LightningElement {
         this.bookerName = '';
         this.bookerEmail = '';
         this.bookerPhone = '';
+        this.fieldValues = {};
+        this.selectedContactId = undefined;
         this.customBookingFields = [];
         this.customFieldValues = {};
         this.durationOptions = [];
@@ -343,6 +470,11 @@ export default class CalendarBooking extends LightningElement {
         this.isRecurring = false;
         this.recurringFrequency = 'Weekly';
         this.recurringOccurrences = 4;
+        this.locationType = 'in_person';
+        this.locationAddress = '';
+        this.googlePlacesApiKey = null;
+        this.videoOptions = [];
+        this.showLocationSection = false;
         this.error = undefined;
     }
 

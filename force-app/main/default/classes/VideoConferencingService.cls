@@ -18,6 +18,11 @@ public with sharing class VideoConferencingService {
     }
 
     private static String createZoomMeeting(Booking__c booking) {
+        String zoomUserId = ZoomTokenService.getDefaultUserId();
+        if (String.isBlank(zoomUserId)) {
+            throw new SchedulingException('ZOOM_CONFIG', 'Zoom_User_Id__c is not configured in Scheduling Settings');
+        }
+
         Map<String, Object> meetingBody = new Map<String, Object>{
             'topic' => booking.Title__c,
             'type' => 2,
@@ -30,9 +35,12 @@ public with sharing class VideoConferencingService {
         };
 
         HttpRequest req = new HttpRequest();
-        req.setEndpoint('callout:Zoom_API/users/me/meetings');
+        req.setEndpoint(
+            'callout:Zoom_API/users/' + EncodingUtil.urlEncode(zoomUserId, 'UTF-8') + '/meetings'
+        );
         req.setMethod('POST');
         req.setHeader('Content-Type', 'application/json');
+        req.setHeader('Authorization', 'Bearer ' + ZoomTokenService.getAccessToken());
         req.setBody(JSON.serialize(meetingBody));
         req.setTimeout(10000);
 

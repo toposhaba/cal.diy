@@ -1,0 +1,426 @@
+<template>
+    <div class="admin-container">
+        <div class="slds-page-header slds-m-bottom_large">
+            <div class="slds-page-header__row">
+                <div class="slds-page-header__col-title">
+                    <div class="slds-media">
+                        <div class="slds-media__figure">
+                            <lightning-icon icon-name="standard:connected_apps" alternative-text="Integrations"></lightning-icon>
+                        </div>
+                        <div class="slds-media__body">
+                            <div class="slds-page-header__name">
+                                <div class="slds-page-header__name-title">
+                                    <h1>
+                                        <span class="slds-page-header__title slds-truncate">Integrations</span>
+                                    </h1>
+                                </div>
+                            </div>
+                            <p class="slds-page-header__name-meta">Org-level credential status, permissions, and health checks</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="slds-page-header__col-actions">
+                    <lightning-button label="Refresh" icon-name="utility:refresh" onclick={handleRefresh}></lightning-button>
+                </div>
+            </div>
+        </div>
+
+        <template lwc:if={isLoading}>
+            <div class="slds-align_absolute-center slds-p-around_xx-large">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template lwc:if={error}>
+            <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_large" role="alert">
+                <h2>{error}</h2>
+            </div>
+        </template>
+
+        <template lwc:if={hasOverview}>
+            <div class="admin-layout">
+                <nav class="section-nav" aria-label="Integration sections">
+                    <ul class="nav-list" role="list">
+                        <template for:each={navSections} for:item="section">
+                            <li key={section.value} class="nav-list-item" role="listitem">
+                                <button
+                                    type="button"
+                                    class={section.navClass}
+                                    data-section={section.value}
+                                    onclick={handleSectionSelect}
+                                    aria-current={section.ariaCurrent}
+                                >
+                                    <lightning-icon icon-name={section.icon} size="x-small" class="nav-item-icon"></lightning-icon>
+                                    <span class="nav-item-label">{section.label}</span>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
+                </nav>
+
+                <main class="section-content">
+                    <div class="section-header">
+                        <h2 class="slds-text-heading_medium">{currentSectionLabel}</h2>
+                    </div>
+
+                    <template lwc:if={isOverviewSection}>
+                        <lightning-card title="Background Jobs" icon-name="utility:clock" class="section-card">
+                            <div class="section-body">
+                                <div class="slds-box job-status-card">
+                                    <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                                        <div>
+                                            <p class="slds-text-title_caps slds-m-bottom_x-small">Calendar sync cron</p>
+                                            <span class="slds-badge {overview.calendarSyncClass}">{overview.calendarSyncLabel}</span>
+                                            <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">Job name: CalDIY_CalendarSync</p>
+                                            <p class="slds-text-body_small slds-text-color_weak slds-m-top_x-small">{overview.calendarSyncGuidance}</p>
+                                        </div>
+                                        <template lwc:if={overview.showCalendarSyncSetup}>
+                                            <lightning-button label="Open Setup Wizard" variant="neutral" data-url={overview.calendarSyncSetupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="slds-box job-status-card slds-m-top_small">
+                                    <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                                        <div>
+                                            <p class="slds-text-title_caps slds-m-bottom_x-small">HR workforce sync cron</p>
+                                            <span class="slds-badge {overview.hrWorkforceSyncClass}">{overview.hrWorkforceSyncLabel}</span>
+                                            <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">Job name: CalDIY_HrWorkforceSync</p>
+                                            <p class="slds-text-body_small slds-text-color_weak">{overview.hrWorkforceSyncLastSyncLabel}</p>
+                                        </div>
+                                        <template lwc:if={overview.showHrWorkforceSyncSetup}>
+                                            <lightning-button label="Open Setup Wizard" variant="neutral" data-url={overview.hrWorkforceSyncSetupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </lightning-card>
+
+                        <lightning-card title="Health Checks" icon-name="utility:health" class="section-card">
+                            <div class="section-body">
+                                <template for:each={overview.healthCheckSections} for:item="section">
+                                    <div key={section.category} class="slds-m-bottom_medium">
+                                        <p class="slds-text-title_bold slds-m-bottom_small">{section.category}</p>
+                                        <template for:each={section.checks} for:item="check">
+                                            <div key={check.title} class={check.itemClass}>
+                                                <div class="slds-box slds-box_x-small">
+                                                    <div class="slds-grid slds-grid_align-spread slds-wrap slds-gutters_small">
+                                                        <div class="slds-col slds-size_1-of-1 slds-large-size_8-of-12 health-check-content">
+                                                            <div class="slds-grid slds-gutters_x-small">
+                                                                <div class="slds-col slds-grow-none">
+                                                                    <lightning-icon icon-name={check.severityIcon} size="small"></lightning-icon>
+                                                                </div>
+                                                                <div class="slds-col">
+                                                                    <span class="slds-badge slds-badge_lightest health-check-category">{check.category}</span>
+                                                                    <p class="slds-text-heading_small health-check-title">{check.title}</p>
+                                                                    <p class="slds-text-body_regular slds-text-color_default health-check-detail">{check.detail}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="slds-col slds-size_1-of-1 slds-large-size_4-of-12 slds-large-text-align_right health-check-actions">
+                                                            <template lwc:if={check.showSetupButton}>
+                                                                <lightning-button label={check.setupLabel} variant="neutral" data-url={check.setupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </lightning-card>
+                    </template>
+
+                    <template lwc:if={isEmailSection}>
+                        <lightning-card title="Email Deliverability" icon-name="utility:email" class="section-card">
+                            <div class="section-body">
+                                <template lwc:if={overview.emailDeliverability}>
+                                    <div class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <h3 class="slds-text-heading_small">Outbound booking emails</h3>
+                                                <span class="slds-badge slds-m-top_x-small {overview.emailDeliverability.statusClass}">{overview.emailDeliverability.statusLabel}</span>
+                                                <p class="slds-text-body_small slds-text-color_weak slds-m-top_x-small">
+                                                    From display name: {overview.emailDeliverability.senderDisplayName}
+                                                    · {overview.emailDeliverability.verifiedCountLabel}
+                                                    · {overview.emailDeliverability.unverifiedCountLabel}
+                                                </p>
+                                            </div>
+                                            <div class="slds-col slds-no-flex slds-shrink-none">
+                                                <lightning-button label="Org-Wide Email Addresses" variant="neutral" data-url={overview.emailDeliverability.setupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                                <template lwc:if={overview.emailDeliverability.showDeliverabilityButton}>
+                                                    <lightning-button label="Deliverability" variant="neutral" data-url={overview.emailDeliverability.deliverabilitySetupUrl} onclick={handleOpenSetup} class="slds-m-left_x-small" icon-name="utility:new_window"></lightning-button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p class="slds-text-body_regular list-card-body">{overview.emailDeliverability.detail}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak list-card-meta">{overview.emailDeliverability.guidance}</p>
+                                        <template lwc:if={overview.emailDeliverability.substituteSenderOnly}>
+                                            <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-top_medium" role="alert">
+                                                <p class="slds-text-body_small">
+                                                    Substitute sender is the only outbound path. Gmail may flag emails as impersonating a host user when the From display name matches a person in your org.
+                                                    Add a verified org-wide email on your domain for production.
+                                                </p>
+                                            </div>
+                                        </template>
+                                        <template lwc:if={overview.emailDeliverability.hasVerifiedAddresses}>
+                                            <p class="slds-text-body_small slds-m-top_medium slds-text-title_bold">Verified addresses</p>
+                                            <ul class="slds-list_dotted slds-m-top_x-small">
+                                                <template for:each={overview.emailDeliverability.verifiedAddresses} for:item="address">
+                                                    <li key={address} class="slds-item">{address}</li>
+                                                </template>
+                                            </ul>
+                                        </template>
+                                        <p class="slds-text-body_small slds-m-top_medium slds-text-title_bold">Setup checklist</p>
+                                        <ul class="slds-list_dotted slds-m-top_x-small list-card-body">
+                                            <template for:each={overview.emailDeliverability.checklistItems} for:item="item">
+                                                <li key={item} class="slds-item">{item}</li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+                            </div>
+                        </lightning-card>
+                    </template>
+
+                    <template lwc:if={isGoogleSection}>
+                        <template lwc:if={googleIntegration}>
+                            <lightning-card title={googleIntegration.label} icon-name="utility:key" class="section-card">
+                                <div class="section-body">
+                                    <div class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <span class="slds-badge {googleIntegration.statusClass}">{googleIntegration.statusLabel}</span>
+                                            </div>
+                                            <div class="slds-col slds-no-flex slds-shrink-none">
+                                                <lightning-button label="Open Setup" variant="neutral" data-url={googleIntegration.setupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                                <template lwc:if={googleIntegration.showAuthenticateButton}>
+                                                    <lightning-button label="Authenticate" variant="brand" data-provider={googleIntegration.key} onclick={handleAuthenticateIntegration} icon-name="utility:connected_apps" class="slds-m-left_x-small"></lightning-button>
+                                                    <lightning-button label="Verify" variant="neutral" data-provider={googleIntegration.key} onclick={handleVerifyOrgAuth} icon-name="utility:check" class="slds-m-left_x-small"></lightning-button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p class="slds-text-body_regular list-card-body">{googleIntegration.detail}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak list-card-meta">{googleIntegration.guidance}</p>
+                                        <template lwc:if={googleIntegration.authStatusLabel}>
+                                            <p class="slds-text-body_small slds-m-top_x-small">{googleIntegration.authStatusLabel}</p>
+                                        </template>
+                                        <template lwc:if={googleIntegration.authProviderName}>
+                                            <p class="slds-text-body_small slds-m-top_x-small">Auth Provider: {googleIntegration.authProviderName}</p>
+                                        </template>
+                                    </div>
+                                </div>
+                            </lightning-card>
+                        </template>
+                    </template>
+
+                    <template lwc:if={isMicrosoftSection}>
+                        <template lwc:if={microsoftIntegration}>
+                            <lightning-card title={microsoftIntegration.label} icon-name="utility:key" class="section-card">
+                                <div class="section-body">
+                                    <div class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <span class="slds-badge {microsoftIntegration.statusClass}">{microsoftIntegration.statusLabel}</span>
+                                            </div>
+                                            <div class="slds-col slds-no-flex slds-shrink-none">
+                                                <lightning-button label="Open Setup" variant="neutral" data-url={microsoftIntegration.setupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                                <template lwc:if={microsoftIntegration.showAuthenticateButton}>
+                                                    <lightning-button label="Authenticate" variant="brand" data-provider={microsoftIntegration.key} onclick={handleAuthenticateIntegration} icon-name="utility:connected_apps" class="slds-m-left_x-small"></lightning-button>
+                                                    <lightning-button label="Verify" variant="neutral" data-provider={microsoftIntegration.key} onclick={handleVerifyOrgAuth} icon-name="utility:check" class="slds-m-left_x-small"></lightning-button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p class="slds-text-body_regular list-card-body">{microsoftIntegration.detail}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak list-card-meta">{microsoftIntegration.guidance}</p>
+                                        <template lwc:if={microsoftIntegration.authStatusLabel}>
+                                            <p class="slds-text-body_small slds-m-top_x-small">{microsoftIntegration.authStatusLabel}</p>
+                                        </template>
+                                        <template lwc:if={microsoftIntegration.authProviderName}>
+                                            <p class="slds-text-body_small slds-m-top_x-small">Auth Provider: {microsoftIntegration.authProviderName}</p>
+                                        </template>
+                                    </div>
+                                </div>
+                            </lightning-card>
+                        </template>
+                    </template>
+
+                    <template lwc:if={isZoomSection}>
+                        <template lwc:if={zoomIntegration}>
+                            <lightning-card title={zoomIntegration.label} icon-name="utility:video" class="section-card">
+                                <div class="section-body">
+                                    <div class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <span class="slds-badge {zoomIntegration.statusClass}">{zoomIntegration.statusLabel}</span>
+                                            </div>
+                                            <div class="slds-col slds-no-flex slds-shrink-none">
+                                                <lightning-button label="Open Setup" variant="neutral" data-url={zoomIntegration.setupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                                <template lwc:if={zoomIntegration.showMetadataLink}>
+                                                    <lightning-button label="Scheduling Settings" variant="neutral" data-url={zoomIntegration.metadataSetupUrl} onclick={handleOpenSetup} class="slds-m-left_x-small"></lightning-button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p class="slds-text-body_regular list-card-body">{zoomIntegration.detail}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak list-card-meta">{zoomIntegration.guidance}</p>
+                                        <template lwc:if={zoomIntegration.authStatusLabel}>
+                                            <p class="slds-text-body_small slds-m-top_x-small">{zoomIntegration.authStatusLabel}</p>
+                                        </template>
+                                    </div>
+                                </div>
+                            </lightning-card>
+                        </template>
+                    </template>
+
+                    <template lwc:if={isPaymentsSection}>
+                        <lightning-card title="Stripe / Twilio / Maps" icon-name="utility:currency" class="section-card">
+                            <div class="section-body">
+                                <template for:each={paymentIntegrations} for:item="integration">
+                                    <div key={integration.key} class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <h3 class="slds-text-heading_small">{integration.label}</h3>
+                                                <span class="slds-badge slds-m-top_x-small {integration.statusClass}">{integration.statusLabel}</span>
+                                            </div>
+                                            <div class="slds-col slds-no-flex slds-shrink-none">
+                                                <lightning-button label="Open Setup" variant="neutral" data-url={integration.setupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                                <template lwc:if={integration.showMetadataLink}>
+                                                    <lightning-button label="Scheduling Settings" variant="neutral" data-url={integration.metadataSetupUrl} onclick={handleOpenSetup} class="slds-m-left_x-small"></lightning-button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p class="slds-text-body_regular list-card-body">{integration.detail}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak list-card-meta">{integration.guidance}</p>
+                                    </div>
+                                </template>
+                            </div>
+                        </lightning-card>
+                    </template>
+
+                    <template lwc:if={isHrisSection}>
+                        <lightning-card title="Workday / HRIS" icon-name="utility:company" class="section-card">
+                            <div class="section-body">
+                                <template for:each={hrisIntegrations} for:item="integration">
+                                    <div key={integration.key} class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <h3 class="slds-text-heading_small">{integration.label}</h3>
+                                                <span class="slds-badge slds-m-top_x-small {integration.statusClass}">{integration.statusLabel}</span>
+                                            </div>
+                                            <div class="slds-col slds-no-flex slds-shrink-none">
+                                                <lightning-button label="Open Setup" variant="neutral" data-url={integration.setupUrl} onclick={handleOpenSetup} icon-name="utility:new_window"></lightning-button>
+                                                <template lwc:if={integration.showMetadataLink}>
+                                                    <lightning-button label="Scheduling Settings" variant="neutral" data-url={integration.metadataSetupUrl} onclick={handleOpenSetup} class="slds-m-left_x-small"></lightning-button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p class="slds-text-body_regular list-card-body">{integration.detail}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak list-card-meta">{integration.guidance}</p>
+                                    </div>
+                                </template>
+                            </div>
+                        </lightning-card>
+                    </template>
+
+                    <template lwc:if={isPermissionsSection}>
+                        <lightning-card title="Permission Sets" icon-name="standard:user_role" class="section-card">
+                            <div class="section-body">
+                                <template for:each={overview.permissionSets} for:item="permSet">
+                                    <div key={permSet.apiName} class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <h3 class="slds-text-heading_small">{permSet.label}</h3>
+                                                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">{permSet.apiName} · {permSet.existsLabel}</p>
+                                            </div>
+                                            <div class="slds-col slds-no-flex slds-grid slds-grid_vertical-align-center">
+                                                <span class="slds-badge slds-m-right_small">{permSet.assignedCount} assigned</span>
+                                                <template lwc:if={permSet.showUserList}>
+                                                    <lightning-button label={permSet.toggleLabel} variant="base" data-key={permSet.expandKey} onclick={handleTogglePermSet}></lightning-button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <template lwc:if={permSet.isExpanded}>
+                                            <ul class="slds-list_dotted slds-m-top_small list-card-body">
+                                                <template for:each={permSet.assignedUsers} for:item="user">
+                                                    <li key={user.userId} class="slds-item">{user.name} ({user.email})</li>
+                                                </template>
+                                            </ul>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </lightning-card>
+
+                        <lightning-card title="Host &amp; Admin Setup" icon-name="standard:people" class="section-card">
+                            <p slot="actions" class="slds-text-body_small slds-p-right_small">{hostUserCount} users with Host or Admin permission</p>
+                            <div class="section-body">
+                                <template for:each={overview.userSetups} for:item="user">
+                                    <div key={user.userId} class="slds-box list-card">
+                                        <div class="slds-grid slds-grid_align-spread slds-wrap list-card-header">
+                                            <div class="slds-col slds-grow">
+                                                <h3 class="slds-text-heading_small">{user.name}</h3>
+                                                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">{user.email}</p>
+                                                <div class="slds-m-top_x-small">
+                                                    <template for:each={user.permBadges} for:item="badge">
+                                                        <span key={badge.label} class={badge.className}>{badge.label}</span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <div class="slds-col slds-no-flex">
+                                                <lightning-button label={user.toggleLabel} variant="base" data-key={user.expandKey} onclick={handleToggleUser}></lightning-button>
+                                            </div>
+                                        </div>
+                                        <p class="slds-text-body_small list-card-meta">{user.setupSummary}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">Connections: {user.connectionSummary}</p>
+                                        <template lwc:if={user.isExpanded}>
+                                            <div class="slds-m-top_medium slds-box slds-theme_shade">
+                                                <p class="slds-text-body_small slds-text-color_weak">
+                                                    Google and Microsoft OAuth are org-level Named Principals. Hosts do not authenticate individually.
+                                                </p>
+                                                <template lwc:if={user.connections}>
+                                                    <table class="slds-table slds-table_cell-buffer slds-m-top_small">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Provider</th>
+                                                                <th>Active</th>
+                                                                <th>Push events</th>
+                                                                <th>Last sync</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <template for:each={user.connections} for:item="conn">
+                                                                <tr key={conn.connectionId}>
+                                                                    <td>{conn.provider}</td>
+                                                                    <td>{conn.isActive}</td>
+                                                                    <td>{conn.pushEvents}</td>
+                                                                    <td>{conn.lastSync}</td>
+                                                                </tr>
+                                                            </template>
+                                                        </tbody>
+                                                    </table>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </lightning-card>
+                    </template>
+
+                    <div class="section-nav-footer slds-grid slds-grid_align-spread slds-m-top_large">
+                        <div>
+                            <template lwc:if={showPrevButton}>
+                                <lightning-button label="Back" icon-name="utility:chevronleft" onclick={handlePrevSection}></lightning-button>
+                            </template>
+                        </div>
+                        <div>
+                            <template lwc:if={showNextButton}>
+                                <lightning-button label="Next" variant="brand" icon-name="utility:chevronright" icon-position="right" onclick={handleNextSection}></lightning-button>
+                            </template>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </template>
+    </div>
+</template>

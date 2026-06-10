@@ -139,7 +139,9 @@ export default class RoutingForm extends LightningElement {
                 startDateTimeStr: this.selectedSlot.startTime,
                 bookerEmail: this.bookerEmail,
                 bookerName: this.bookerName,
-                attendeeEmails: []
+                attendeeEmails: [],
+                location: null,
+                videoProvider: null
             });
             this.bookingConfirmed = true;
             this.currentStep = 'confirmation';
@@ -211,6 +213,7 @@ export default class RoutingForm extends LightningElement {
             isEmail: f.fieldType === 'Email',
             isPhone: f.fieldType === 'Phone',
             isText: f.fieldType === 'Text' || f.fieldType === 'MultiSelect',
+            isRequired: f.isRequired !== false,
             value: this.fieldValues[f.id] || '',
             selectOptions: (f.options || []).map(o => ({ label: o, value: o }))
         }));

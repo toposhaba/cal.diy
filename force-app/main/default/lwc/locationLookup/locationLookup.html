@@ -1,0 +1,31 @@
+<template>
+    <template lwc:if={usePlaces}>
+        <div class="slds-form-element">
+            <label class="slds-form-element__label">
+                <template lwc:if={required}>
+                    <abbr class="slds-required" title="required">* </abbr>
+                </template>
+                {label}
+            </label>
+            <div class="slds-form-element__control">
+                <input
+                    type="text"
+                    class="slds-input"
+                    data-id="address-input"
+                    value={value}
+                    placeholder="Search for an address..."
+                    onblur={handleInputBlur}
+                />
+            </div>
+        </div>
+    </template>
+    <template lwc:else>
+        <lightning-input
+            type="text"
+            label={label}
+            value={value}
+            required={required}
+            onchange={handleInputChange}
+        ></lightning-input>
+    </template>
+</template>

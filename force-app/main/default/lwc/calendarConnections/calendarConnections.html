@@ -19,6 +19,13 @@
         </template>
 
         <div class="slds-p-around_medium">
+            <template lwc:if={orgAuthNotice}>
+                <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_medium" role="alert">
+                    <p class="slds-text-body_regular">{orgAuthNotice}</p>
+                </div>
+                <lightning-button label="Open Integrations" variant="neutral" onclick={handleOpenIntegrations} icon-name="utility:settings" class="slds-m-bottom_medium"></lightning-button>
+            </template>
+
             <template lwc:if={hasConnections}>
                 <template for:each={formattedConnections} for:item="conn">
                     <div key={conn.Id} class="slds-box slds-m-bottom_small">
@@ -30,6 +37,7 @@
                                 </template>
                                 <div class="slds-m-top_xx-small">
                                     <span class={conn.statusClass}>{conn.statusLabel}</span>
+                                    <span class={conn.integrationClass}>{conn.integrationLabel}</span>
                                     <template lwc:if={conn.Check_For_Conflicts__c}>
                                         <span class="slds-badge slds-m-left_xx-small">Conflict Check</span>
                                     </template>
@@ -57,7 +65,6 @@
         </div>
     </lightning-card>
 
-    <!-- Add Connection Modal -->
     <template lwc:if={showAddForm}>
         <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
             <div class="slds-modal__container">
@@ -66,6 +73,9 @@
                     <h2 class="slds-text-heading_medium">Add Calendar Connection</h2>
                 </header>
                 <div class="slds-modal__content slds-p-around_medium">
+                    <p class="slds-text-body_small slds-text-color_weak slds-m-bottom_small">
+                        Google and Microsoft use one org-level OAuth account. Your admin authenticates in Integrations; you only choose which calendar to use.
+                    </p>
                     <lightning-combobox label="Provider" options={providerOptions} value={newProvider} onchange={handleProviderChange} required></lightning-combobox>
                     <lightning-input type="text" label="Calendar ID (optional)" value={newCalendarId} onchange={handleCalendarIdChange} class="slds-m-top_small" placeholder="Leave blank for primary calendar"></lightning-input>
                     <lightning-input type="checkbox" label="Check for scheduling conflicts" checked={newCheckConflicts} onchange={handleCheckConflictsChange} class="slds-m-top_small"></lightning-input>

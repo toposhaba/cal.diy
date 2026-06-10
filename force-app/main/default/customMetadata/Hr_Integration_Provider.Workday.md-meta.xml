@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Workday</label>
+    <protected>false</protected>
+    <values>
+        <field>Provider_Key__c</field>
+        <value xsi:type="xsd:string">Workday</value>
+    </values>
+    <values>
+        <field>Is_Enabled__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Is_Implemented__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>Named_Credential__c</field>
+        <value xsi:type="xsd:string">Workday_API</value>
+    </values>
+    <values>
+        <field>Absence_Report_Path__c</field>
+        <value xsi:type="xsd:string">ccx/service/customreport2/tenant/ISU/CalDIY_Approved_Absences?format=json</value>
+    </values>
+    <values>
+        <field>Schedule_Report_Path__c</field>
+        <value xsi:type="xsd:string">ccx/service/customreport2/tenant/ISU/CalDIY_Worker_Schedules?format=json</value>
+    </values>
+    <values>
+        <field>Worker_Id_User_Field__c</field>
+        <value xsi:type="xsd:string">Workday_Worker_Id__c</value>
+    </values>
+    <values>
+        <field>Setup_Guidance__c</field>
+        <value xsi:type="xsd:string">Configure Workday_API named credential with your tenant services URL. Create an Integration System User (ISU) and map Workday_Principal via Scheduling Admin permission set. Set absence and schedule RaaS report paths in Scheduling Settings or on this provider record. Map workers by Workday_Worker_Id__c or User email.</value>
+    </values>
+</CustomMetadata>

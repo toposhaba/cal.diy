@@ -21,6 +21,23 @@ private class SchedulingControllerTest {
     }
 
     @IsTest
+    static void testGetBookingLocationSettings() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Location Event', 30);
+
+            Test.startTest();
+            MeetingOptionsService.BookingLocationSettings settings =
+                SchedulingController.getBookingLocationSettings(testUser.Id, eventType.Id);
+            Test.stopTest();
+
+            System.assertNotEquals(null, settings);
+            System.assertNotEquals(null, settings.videoOptions);
+        }
+    }
+
+    @IsTest
     static void testGetActiveEventTypesCurrentUser() {
         User testUser = SchedulingTestDataFactory.createTestUser();
 
@@ -138,7 +155,7 @@ private class SchedulingControllerTest {
 
             Test.startTest();
             Booking__c booking = SchedulingController.createBooking(
-                eventType.Id, startStr, 'booker@test.com', 'Test Booker', new List<String>()
+                eventType.Id, startStr, 'booker@test.com', 'Test Booker', new List<String>(), null, null
             );
             Test.stopTest();
 
@@ -235,7 +252,8 @@ private class SchedulingControllerTest {
             Test.startTest();
             List<Booking__c> results = SchedulingController.getMyBookings(
                 String.valueOf(Date.today()),
-                String.valueOf(Date.today().addDays(30))
+                String.valueOf(Date.today().addDays(30)),
+                null
             );
             Test.stopTest();
 

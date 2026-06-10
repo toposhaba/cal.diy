@@ -1,4 +1,4 @@
-public with sharing class IcsGenerator {
+public without sharing class IcsGenerator {
 
     public static String generateIcsContent(Id bookingId) {
         Booking__c booking = [
@@ -8,7 +8,7 @@ public with sharing class IcsGenerator {
                    Event_Type__r.Description__c
             FROM Booking__c
             WHERE Id = :bookingId
-            WITH USER_MODE
+            WITH SYSTEM_MODE
             LIMIT 1
         ];
 
@@ -51,7 +51,7 @@ public with sharing class IcsGenerator {
         Messaging.EmailFileAttachment attachment = new Messaging.EmailFileAttachment();
         attachment.setFileName('invite.ics');
         attachment.setBody(Blob.valueOf(icsContent));
-        attachment.setContentType('text/calendar; method=REQUEST');
+        attachment.setContentType('text/calendar; charset=UTF-8');
         return attachment;
     }
 

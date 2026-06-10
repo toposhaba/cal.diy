@@ -5,13 +5,22 @@
         </div>
 
         <div class="slds-p-around_medium">
-            <div class="slds-grid slds-gutters_small slds-m-bottom_medium">
+            <div class="slds-grid slds-gutters_small slds-m-bottom_small">
                 <div class="slds-col slds-size_1-of-2">
                     <lightning-input type="date" label="From" value={startDate} onchange={handleStartDateChange}></lightning-input>
                 </div>
                 <div class="slds-col slds-size_1-of-2">
                     <lightning-input type="date" label="To" value={endDate} onchange={handleEndDateChange}></lightning-input>
                 </div>
+            </div>
+            <div class="slds-m-bottom_medium">
+                <lightning-input
+                    type="search"
+                    label="Search"
+                    placeholder="Search by title, booker name, or email"
+                    value={searchTerm}
+                    onchange={handleSearchChange}>
+                </lightning-input>
             </div>
 
             <template lwc:if={isLoading}>
@@ -69,7 +78,7 @@
             <template lwc:if={noBookings}>
                 <template lwc:if={notLoading}>
                     <div class="slds-align_absolute-center slds-p-around_large">
-                        <p class="slds-text-color_weak">No bookings found for this period.</p>
+                        <p class="slds-text-color_weak">{emptyMessage}</p>
                     </div>
                 </template>
             </template>

@@ -5,6 +5,7 @@ public with sharing class RoutingFormService {
         @AuraEnabled public String name { get; set; }
         @AuraEnabled public String fieldType { get; set; }
         @AuraEnabled public List<String> options { get; set; }
+        @AuraEnabled public Boolean isRequired { get; set; }
     }
 
     public class RoutingResult {
@@ -15,10 +16,11 @@ public with sharing class RoutingFormService {
     public static List<Routing_Form__c> getActiveForms(Id ownerUserId) {
         Id targetUser = ownerUserId != null ? ownerUserId : UserInfo.getUserId();
         return [
-            SELECT Id, Name, Description__c
+            SELECT Id, Name, Description__c, Is_Active__c
             FROM Routing_Form__c
-            WHERE Owner_User__c = :targetUser
-                OR (Owner_User__c = null AND OwnerId = :targetUser)
+            WHERE (Owner_User__c = :targetUser
+                OR (Owner_User__c = null AND OwnerId = :targetUser))
+                AND Is_Active__c = true
             WITH USER_MODE
             ORDER BY Name ASC
         ];
@@ -32,6 +34,7 @@ public with sharing class RoutingFormService {
             info.name = field.Name;
             info.fieldType = field.Field_Type__c;
             info.options = parseOptions(field.Options__c);
+            info.isRequired = field.Is_Required__c != false;
             fields.add(info);
         }
         return fields;
@@ -79,11 +82,11 @@ public with sharing class RoutingFormService {
 
     public static List<Routing_Form_Field__c> getFormFields(Id routingFormId) {
         return [
-            SELECT Id, Name, Field_Type__c, Options__c
+            SELECT Id, Name, Field_Type__c, Options__c, Is_Required__c, Sort_Order__c
             FROM Routing_Form_Field__c
             WHERE Routing_Form__c = :routingFormId
             WITH USER_MODE
-            ORDER BY Name ASC
+            ORDER BY Sort_Order__c ASC NULLS LAST, Name ASC
         ];
     }
 

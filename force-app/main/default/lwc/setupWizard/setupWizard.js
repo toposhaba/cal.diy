@@ -1,5 +1,6 @@
-import { LightningElement, track } from 'lwc';
+import { LightningElement, track, wire } from 'lwc';
 import { NavigationMixin } from 'lightning/navigation';
+import userTimeZone from '@salesforce/i18n/timeZone';
 import getOnboardingStatus from '@salesforce/apex/SchedulingController.getOnboardingStatus';
 import createSchedule from '@salesforce/apex/SchedulingController.createSchedule';
 import addAvailability from '@salesforce/apex/SchedulingController.addAvailability';
@@ -8,6 +9,7 @@ import scheduleBackgroundJobs from '@salesforce/apex/SchedulingController.schedu
 import createConnection from '@salesforce/apex/CalendarConnectionController.createConnection';
 import getNamedCredentialAuthUrl from '@salesforce/apex/CalendarConnectionController.getNamedCredentialAuthUrl';
 import verifyConnection from '@salesforce/apex/CalendarConnectionController.verifyConnection';
+import isSchedulingAdminUser from '@salesforce/apex/CalendarConnectionController.isSchedulingAdminUser';
 import getMySchedules from '@salesforce/apex/SchedulingController.getMySchedules';
 import getActiveEventTypes from '@salesforce/apex/SchedulingController.getActiveEventTypes';
 
@@ -16,11 +18,18 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
     @track isLoading = true;
     @track error;
     @track onboardingStatus = {};
-    @track oauthStatus = '';
+    @track orgAuthStatus = '';
+    @track orgAuthMessage = '';
+    @track orgAuthIntegrationsUrl = '';
+    @track showOrgAuthNotice = false;
+    @track showAdminOAuthFlow = false;
+    @track oauthAuthUrl = '';
     @track oauthSetupUrl = '';
-    @track showOAuthInstructions = false;
+    @track oauthNotConfigured = false;
+    @track oauthSetupMessage = '';
+    @track isSchedulingAdmin = false;
 
-    selectedTimeZone = 'America/New_York';
+    selectedTimeZone;
 
     calendarProvider = '';
     calendarId = '';
@@ -37,6 +46,11 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
     eventTypeDescription = '';
 
     @track dashboardData = {};
+
+    @wire(isSchedulingAdminUser)
+    wiredIsSchedulingAdmin({ data }) {
+        this.isSchedulingAdmin = data === true;
+    }
 
     get steps() {
         return [
@@ -118,12 +132,39 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
     get isEventTypeStep() { return this.currentStep === 'event-type'; }
     get isDashboard() { return this.currentStep === 'dashboard'; }
     get isWizard() { return !this.isDashboard && this.currentStep !== 'loading'; }
-    get requiresOAuth() { return this.calendarProvider === 'Google' || this.calendarProvider === 'Microsoft'; }
+    get requiresOrgAuth() { return this.calendarProvider === 'Google' || this.calendarProvider === 'Microsoft'; }
     get isSalesforceProvider() { return this.calendarProvider === 'Salesforce'; }
-    get notShowingOAuth() { return !this.showOAuthInstructions; }
+    get notShowingOrgAuthNotice() { return !this.showOrgAuthNotice; }
+    get showingAdminOAuthFlow() { return this.showAdminOAuthFlow; }
+    get notShowingAdminOAuthFlow() { return !this.showAdminOAuthFlow; }
+    get showingDashboardAdminAuth() { return this.isDashboard && this.isSchedulingAdmin && !this.showAdminOAuthFlow; }
+    get showingDashboardAdminOAuthFlow() { return this.isDashboard && this.showAdminOAuthFlow; }
+
+    get calendarProviderLabel() {
+        return this.getProviderLabel(this.calendarProvider);
+    }
+
+    get configureOAuthHeading() {
+        return `Configure ${this.calendarProviderLabel} OAuth First`;
+    }
+
+    get authenticateCalendarHeading() {
+        return `Authenticate ${this.calendarProviderLabel} (Admin)`;
+    }
+
+    getProviderLabel(provider) {
+        const map = { Google: 'Google Calendar', Microsoft: 'Microsoft Outlook', Salesforce: 'Salesforce Events' };
+        return map[provider] || provider;
+    }
 
     connectedCallback() {
+        this.selectedTimeZone = this.resolveDefaultTimeZone();
         this.checkStatus();
+    }
+
+    resolveDefaultTimeZone() {
+        const match = this.timezoneOptions.find((option) => option.value === userTimeZone);
+        return match ? match.value : 'America/New_York';
     }
 
     async checkStatus() {
@@ -172,6 +213,7 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
 
     handleProviderChange(event) {
         this.calendarProvider = event.detail.value;
+        this.resetOrgAuthState();
     }
 
     handleCalendarIdChange(event) {
@@ -186,6 +228,18 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
         this.calendarPushEvents = event.target.checked;
     }
 
+    resetOrgAuthState() {
+        this.showOrgAuthNotice = false;
+        this.showAdminOAuthFlow = false;
+        this.orgAuthStatus = '';
+        this.orgAuthMessage = '';
+        this.orgAuthIntegrationsUrl = '';
+        this.oauthAuthUrl = '';
+        this.oauthSetupUrl = '';
+        this.oauthNotConfigured = false;
+        this.oauthSetupMessage = '';
+    }
+
     async handleConnectCalendar() {
         if (!this.calendarProvider) {
             this.error = 'Please select a calendar provider';
@@ -193,31 +247,30 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
         }
 
         if (this.calendarProvider === 'Salesforce') {
-            this.isLoading = true;
-            this.error = undefined;
-            try {
-                await createConnection({
-                    provider: this.calendarProvider,
-                    calendarId: this.calendarId,
-                    checkConflicts: this.calendarCheckConflicts,
-                    pushEvents: this.calendarPushEvents
-                });
-                this.currentStep = 'availability';
-            } catch (err) {
-                this.error = this.extractError(err);
-            } finally {
-                this.isLoading = false;
-            }
+            await this.saveCalendarConnection();
             return;
         }
 
         this.isLoading = true;
         this.error = undefined;
+        this.resetOrgAuthState();
         try {
-            const authInfo = await getNamedCredentialAuthUrl({ provider: this.calendarProvider });
-            this.oauthSetupUrl = authInfo.setupUrl;
-            this.showOAuthInstructions = true;
-            this.oauthStatus = 'pending';
+            const verifyResult = await verifyConnection({ provider: this.calendarProvider });
+            if (verifyResult.authenticated) {
+                await this.saveCalendarConnection();
+                return;
+            }
+
+            if (this.isSchedulingAdmin) {
+                await this.startAdminOAuthFlow(this.calendarProvider);
+                return;
+            }
+
+            this.showOrgAuthNotice = true;
+            this.orgAuthStatus = 'admin_required';
+            this.orgAuthMessage = verifyResult.message ||
+                'Your Scheduling Admin must authenticate Google or Microsoft in Integrations before you can connect a calendar.';
+            this.orgAuthIntegrationsUrl = '/lightning/n/Integrations';
         } catch (err) {
             this.error = this.extractError(err);
         } finally {
@@ -225,40 +278,120 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
         }
     }
 
+    async saveCalendarConnection() {
+        this.isLoading = true;
+        this.error = undefined;
+        try {
+            await createConnection({
+                provider: this.calendarProvider,
+                calendarId: this.calendarId,
+                checkConflicts: this.calendarCheckConflicts,
+                pushEvents: this.calendarPushEvents
+            });
+            this.resetOrgAuthState();
+            if (this.isCalendarStep) {
+                this.currentStep = 'availability';
+            } else if (this.isDashboard) {
+                await this.loadDashboard();
+            }
+        } catch (err) {
+            this.error = this.extractError(err);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    async startAdminOAuthFlow(provider) {
+        this.calendarProvider = provider;
+        this.showAdminOAuthFlow = true;
+        this.oauthNotConfigured = false;
+        this.oauthSetupMessage = '';
+        this.oauthSetupUrl = '';
+        this.oauthAuthUrl = '';
+        try {
+            const authInfo = await getNamedCredentialAuthUrl({
+                provider,
+                returnPageApiName: 'Integrations'
+            });
+            this.oauthNotConfigured = authInfo.type === 'oauth_not_configured';
+            this.oauthSetupMessage = authInfo.message || '';
+            this.oauthSetupUrl = authInfo.setupUrl || '';
+            this.oauthAuthUrl = authInfo.authUrl || '';
+        } catch (err) {
+            this.error = this.extractError(err);
+            this.showAdminOAuthFlow = false;
+        }
+    }
+
+    handleAuthenticateGoogleAdmin() {
+        this.startAdminOAuthFlow('Google');
+    }
+
+    handleAuthenticateMicrosoftAdmin() {
+        this.startAdminOAuthFlow('Microsoft');
+    }
+
+    handleCancelAdminAuth() {
+        this.resetOrgAuthState();
+        this.error = undefined;
+    }
+
+    handleAuthorizeOAuth() {
+        if (this.oauthNotConfigured) {
+            this.error = this.oauthSetupMessage || 'OAuth is not configured yet. Configure the Auth Provider in Setup first.';
+            return;
+        }
+        if (this.oauthAuthUrl) {
+            const popup = window.open(
+                this.oauthAuthUrl,
+                'calDiyOAuth',
+                'width=600,height=700,menubar=no,toolbar=no,location=yes,status=yes,resizable=yes,scrollbars=yes'
+            );
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+                this.error = 'Popup blocked. Allow popups for this site, then try again.';
+                return;
+            }
+            popup.focus();
+        }
+    }
+
     handleOpenOAuthSetup() {
-        window.open(this.oauthSetupUrl, '_blank');
+        if (this.oauthSetupUrl) {
+            window.open(this.oauthSetupUrl, '_blank');
+        }
+    }
+
+    handleOpenIntegrations() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__navItemPage',
+            attributes: { apiName: 'Integrations' }
+        });
     }
 
     async handleVerifyOAuth() {
         this.isLoading = true;
         this.error = undefined;
-        this.oauthStatus = 'verifying';
         try {
             const result = await verifyConnection({ provider: this.calendarProvider });
             if (result.authenticated) {
-                this.oauthStatus = 'connected';
-                await createConnection({
-                    provider: this.calendarProvider,
-                    calendarId: this.calendarId,
-                    checkConflicts: this.calendarCheckConflicts,
-                    pushEvents: this.calendarPushEvents
-                });
-                this.showOAuthInstructions = false;
-                this.currentStep = 'availability';
+                this.resetOrgAuthState();
+                if (this.isCalendarStep) {
+                    await this.saveCalendarConnection();
+                } else if (this.isDashboard) {
+                    await this.loadDashboard();
+                }
             } else {
-                this.oauthStatus = 'failed';
                 this.error = result.message;
             }
         } catch (err) {
-            this.oauthStatus = 'failed';
             this.error = this.extractError(err);
         } finally {
             this.isLoading = false;
         }
     }
 
-    handleSkipOAuth() {
-        this.showOAuthInstructions = false;
+    handleSkipOrgAuth() {
+        this.resetOrgAuthState();
         this.currentStep = 'availability';
     }
 
@@ -365,6 +498,7 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
     }
 
     handleRestartWizard() {
+        this.selectedTimeZone = this.resolveDefaultTimeZone();
         this.currentStep = 'timezone';
     }
 
@@ -386,6 +520,13 @@ export default class SetupWizard extends NavigationMixin(LightningElement) {
         this[NavigationMixin.Navigate]({
             type: 'standard__navItemPage',
             attributes: { apiName: 'Booking_Manager' }
+        });
+    }
+
+    handleOpenCalendarConnections() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__navItemPage',
+            attributes: { apiName: 'Calendar_Connections' }
         });
     }
 

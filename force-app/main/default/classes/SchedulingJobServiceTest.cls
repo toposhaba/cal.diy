@@ -13,9 +13,9 @@ private class SchedulingJobServiceTest {
             List<CronTrigger> jobs = [
                 SELECT CronJobDetail.Name
                 FROM CronTrigger
-                WHERE CronJobDetail.Name IN ('CalDIY_CalendarSync', 'CalDIY_WorkflowReminder')
+                WHERE CronJobDetail.Name IN ('CalDIY_CalendarSync', 'CalDIY_WorkflowReminder', 'CalDIY_HrWorkforceSync')
             ];
-            System.assertEquals(2, jobs.size());
+            System.assertEquals(3, jobs.size());
         }
     }
 

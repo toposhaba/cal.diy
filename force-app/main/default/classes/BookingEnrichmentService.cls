@@ -3,7 +3,7 @@ public with sharing class BookingEnrichmentService {
     public static void ensureMeetingLink(Id bookingId) {
         List<Booking__c> bookings = [
             SELECT Id, Title__c, Start_DateTime__c, End_DateTime__c, Location__c,
-                   Event_Type__r.Video_Provider__c
+                   Video_Provider__c, Event_Type__r.Video_Provider__c
             FROM Booking__c
             WHERE Id = :bookingId
             WITH USER_MODE
@@ -15,9 +15,12 @@ public with sharing class BookingEnrichmentService {
         }
 
         Booking__c booking = bookings[0];
-        String provider = booking.Event_Type__r.Video_Provider__c;
+        String provider = resolveVideoProvider(
+            booking.Video_Provider__c,
+            booking.Event_Type__r.Video_Provider__c
+        );
 
-        if (String.isBlank(provider) || provider == 'None') {
+        if (String.isBlank(provider)) {
             return;
         }
 
@@ -36,5 +39,15 @@ public with sharing class BookingEnrichmentService {
             booking.Location__c = meetingUrl;
             update as user booking;
         }
+    }
+
+    private static String resolveVideoProvider(String bookingProvider, String eventTypeProvider) {
+        if (String.isNotBlank(bookingProvider) && bookingProvider != 'None') {
+            return bookingProvider;
+        }
+        if (String.isNotBlank(eventTypeProvider) && eventTypeProvider != 'None') {
+            return eventTypeProvider;
+        }
+        return null;
     }
 }

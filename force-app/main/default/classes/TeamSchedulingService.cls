@@ -168,6 +168,7 @@ public with sharing class TeamSchedulingService {
             WHERE User__c = :userId
                 AND Start_Date__c <= :slotStart.date()
                 AND End_Date__c >= :slotEnd.date()
+                AND (Status__c = 'Approved' OR Status__c = null)
             WITH USER_MODE
             LIMIT 1
         ];

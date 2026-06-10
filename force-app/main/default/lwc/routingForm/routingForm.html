@@ -47,17 +47,17 @@
                                 options={field.selectOptions}
                                 data-field={field.id}
                                 onchange={handleFieldChange}
-                                required>
+                                required={field.isRequired}>
                             </lightning-combobox>
                         </template>
                         <template lwc:elseif={field.isEmail}>
-                            <lightning-input type="email" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required></lightning-input>
+                            <lightning-input type="email" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required={field.isRequired}></lightning-input>
                         </template>
                         <template lwc:elseif={field.isPhone}>
-                            <lightning-input type="tel" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required></lightning-input>
+                            <lightning-input type="tel" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required={field.isRequired}></lightning-input>
                         </template>
                         <template lwc:else>
-                            <lightning-input type="text" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required></lightning-input>
+                            <lightning-input type="text" label={field.name} value={field.value} data-field={field.id} onchange={handleFieldChange} required={field.isRequired}></lightning-input>
                         </template>
                     </div>
                 </template>

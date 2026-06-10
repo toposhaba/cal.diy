@@ -5,6 +5,34 @@ public with sharing class CalendarConnectionController {
         'Microsoft' => 'Microsoft_Graph'
     };
 
+    private static final Map<String, String> PROVIDER_EXTERNAL_CREDENTIALS = new Map<String, String>{
+        'Google' => 'Google_Calendar_Credential',
+        'Microsoft' => 'Microsoft_Graph_Credential'
+    };
+
+    private static final Map<String, String> PROVIDER_PRINCIPAL_NAMES = new Map<String, String>{
+        'Google' => 'Google_Calendar_Principal',
+        'Microsoft' => 'Microsoft_Graph_Principal'
+    };
+
+    private static final Map<String, String> PROVIDER_AUTH_PROVIDERS = new Map<String, String>{
+        'Google' => 'Google Calendar Auth',
+        'Microsoft' => 'Microsoft Graph Auth'
+    };
+
+    private static final Map<String, String> PROVIDER_AUTH_PROVIDER_DEV_NAMES = new Map<String, String>{
+        'Google' => 'Google_Calendar_Auth',
+        'Microsoft' => 'Microsoft_Graph_Auth'
+    };
+
+    private static final Set<String> PLACEHOLDER_VALUES = new Set<String>{
+        'CONFIGURE_IN_SETUP',
+        'YOUR_CLIENT_ID',
+        'CHANGEME',
+        'PLACEHOLDER',
+        'PLACEHOLDER_VALUE'
+    };
+
     @AuraEnabled(cacheable=true)
     public static List<Calendar_Connection__c> getConnections() {
         return [
@@ -17,24 +45,76 @@ public with sharing class CalendarConnectionController {
         ];
     }
 
-    @AuraEnabled
-    public static Map<String, String> getNamedCredentialAuthUrl(String provider) {
-        Map<String, String> result = new Map<String, String>();
-        String namedCredential = PROVIDER_NAMED_CREDENTIALS.get(provider);
+    @AuraEnabled(cacheable=true)
+    public static Boolean isSchedulingAdminUser() {
+        return isSchedulingAdmin();
+    }
 
-        if (namedCredential == null) {
+    @AuraEnabled
+    public static Map<String, String> getNamedCredentialAuthUrl(String provider, String returnPageApiName) {
+        Map<String, String> result = new Map<String, String>();
+        String externalCredential = PROVIDER_EXTERNAL_CREDENTIALS.get(provider);
+        String orgUrl = URL.getOrgDomainURL().toExternalForm();
+        String integrationsUrl = orgUrl + '/lightning/n/Integrations';
+        String externalCredentialSetupUrl = buildExternalCredentialSetupUrl();
+
+        if (externalCredential == null) {
             result.put('type', 'none');
             result.put('message', 'No OAuth required for ' + provider);
             return result;
         }
 
-        String baseUrl = URL.getOrgDomainURL().toExternalForm();
-        String authPageUrl = baseUrl + '/lightning/setup/NamedCredential/home';
+        if (!isAuthProviderConfigured(provider)) {
+            result.put('type', 'oauth_not_configured');
+            result.put('provider', provider);
+            result.put('authProviderName', PROVIDER_AUTH_PROVIDERS.get(provider));
+            result.put('setupUrl', orgUrl + '/lightning/setup/AuthProviders/home');
+            result.put('integrationsUrl', integrationsUrl);
+            result.put('message', buildOAuthNotConfiguredMessage(provider));
+            return result;
+        }
 
-        result.put('type', 'oauth');
-        result.put('namedCredential', namedCredential);
-        result.put('setupUrl', authPageUrl);
-        result.put('provider', provider);
+        if (!isSchedulingAdmin()) {
+            result.put('type', 'admin_required');
+            result.put('provider', provider);
+            result.put('integrationsUrl', integrationsUrl);
+            result.put('setupUrl', externalCredentialSetupUrl);
+            result.put('message', buildAdminRequiredMessage(provider));
+            return result;
+        }
+
+        if (Test.isRunningTest()) {
+            result.put('type', 'admin_oauth');
+            result.put('authUrl', 'https://example.com/oauth');
+            result.put('provider', provider);
+            result.put('setupUrl', externalCredentialSetupUrl);
+            result.put('integrationsUrl', integrationsUrl);
+            return result;
+        }
+
+        try {
+            ConnectApi.OAuthCredentialAuthUrlInput input = new ConnectApi.OAuthCredentialAuthUrlInput();
+            input.externalCredential = externalCredential;
+            input.principalType = ConnectApi.CredentialPrincipalType.NamedPrincipal;
+            input.principalName = PROVIDER_PRINCIPAL_NAMES.get(provider);
+            input.returnUrl = integrationsUrl;
+
+            ConnectApi.OAuthCredentialAuthUrl output =
+                ConnectApi.NamedCredentials.getOAuthCredentialAuthUrl(input);
+
+            result.put('type', 'admin_oauth');
+            result.put('authUrl', output.authenticationUrl);
+            result.put('provider', provider);
+            result.put('setupUrl', externalCredentialSetupUrl);
+            result.put('integrationsUrl', integrationsUrl);
+        } catch (Exception e) {
+            AuraHandledException ex = new AuraHandledException(
+                'Unable to generate OAuth URL: ' + e.getMessage()
+            );
+            ex.setMessage('Unable to generate OAuth URL: ' + e.getMessage());
+            throw ex;
+        }
+
         return result;
     }
 
@@ -46,6 +126,12 @@ public with sharing class CalendarConnectionController {
         if (namedCredential == null || provider == 'Salesforce') {
             result.put('authenticated', true);
             result.put('message', 'No external authentication needed');
+            return result;
+        }
+
+        if (Test.isRunningTest()) {
+            result.put('authenticated', false);
+            result.put('message', 'Org calendar integration is not authenticated in test context.');
             return result;
         }
 
@@ -65,17 +151,17 @@ public with sharing class CalendarConnectionController {
 
             if (statusCode == 200) {
                 result.put('authenticated', true);
-                result.put('message', 'Connected successfully');
+                result.put('message', 'Org calendar integration is authenticated.');
             } else if (statusCode == 401 || statusCode == 403) {
                 result.put('authenticated', false);
-                result.put('message', 'Not authorized. Please complete the OAuth flow in Setup.');
+                result.put('message', buildOrgNotAuthenticatedMessage(provider));
             } else {
                 result.put('authenticated', false);
                 result.put('message', 'Connection check returned status: ' + statusCode);
             }
         } catch (Exception e) {
             result.put('authenticated', false);
-            result.put('message', 'OAuth not configured or not authorized: ' + e.getMessage());
+            result.put('message', buildOrgNotAuthenticatedMessage(provider));
         }
 
         return result;
@@ -143,5 +229,82 @@ public with sharing class CalendarConnectionController {
         Calendar_Connection__c conn = connList[0];
 
         delete as user conn;
+    }
+
+    @TestVisible
+    private static Boolean isSchedulingAdmin() {
+        List<PermissionSetAssignment> adminAssignments = [
+            SELECT Id
+            FROM PermissionSetAssignment
+            WHERE AssigneeId = :UserInfo.getUserId()
+                AND PermissionSet.Name = 'Scheduling_Admin'
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        return !adminAssignments.isEmpty();
+    }
+
+    @TestVisible
+    private static Boolean isAuthProviderConfigured(String provider) {
+        String developerName = PROVIDER_AUTH_PROVIDER_DEV_NAMES.get(provider);
+        if (developerName == null) {
+            return false;
+        }
+
+        List<AuthProvider> providers = [
+            SELECT ConsumerKey, ConsumerSecret
+            FROM AuthProvider
+            WHERE DeveloperName = :developerName
+            LIMIT 1
+        ];
+
+        if (providers.isEmpty()) {
+            return false;
+        }
+
+        AuthProvider ap = providers[0];
+        return !isPlaceholder(ap.ConsumerKey) && !isPlaceholder(ap.ConsumerSecret);
+    }
+
+    @TestVisible
+    private static Boolean isPlaceholder(String value) {
+        return String.isBlank(value) || PLACEHOLDER_VALUES.contains(value.toUpperCase());
+    }
+
+    @TestVisible
+    private static String buildExternalCredentialSetupUrl() {
+        return URL.getOrgDomainURL().toExternalForm() + '/lightning/setup/NamedCredential/home';
+    }
+
+    @TestVisible
+    private static String buildAdminRequiredMessage(String provider) {
+        String providerLabel = provider == 'Google' ? 'Google Calendar' : 'Microsoft Outlook';
+        return providerLabel + ' is authenticated once at the org level by a Scheduling Admin. ' +
+            'Open Integrations to complete setup, then add your calendar connection here.';
+    }
+
+    @TestVisible
+    private static String buildOrgNotAuthenticatedMessage(String provider) {
+        String providerLabel = provider == 'Google' ? 'Google Calendar' : 'Microsoft Outlook';
+        return providerLabel + ' is not authenticated at the org level. A Scheduling Admin must authenticate ' +
+            'the Named Principal in Integrations or Setup → External Credentials → Permission Set Mapping.';
+    }
+
+    @TestVisible
+    private static String buildOAuthNotConfiguredMessage(String provider) {
+        String authProviderName = PROVIDER_AUTH_PROVIDERS.get(provider);
+        if (provider == 'Google') {
+            return 'Google Calendar OAuth is not configured. In Google Cloud Console, create an OAuth 2.0 Web client ' +
+                'with the Google Calendar API enabled and add the Salesforce callback URL from Setup → Auth. Providers → ' +
+                authProviderName + '. Then paste the Client ID and Client Secret into that Auth Provider before authenticating the org-level principal.';
+        }
+        if (provider == 'Microsoft') {
+            return 'Microsoft Graph OAuth is not configured. In Microsoft Entra ID, register an app with the ' +
+                'Microsoft Graph Calendars.ReadWrite delegated permission and add the Salesforce callback URL from ' +
+                'Setup → Auth. Providers → ' + authProviderName + '. Then paste the Application (client) ID and ' +
+                'client secret into that Auth Provider before authenticating the org-level principal.';
+        }
+        return authProviderName + ' OAuth is not configured. Ask your Salesforce administrator to configure the ' +
+            'Auth Provider in Setup before authenticating.';
     }
 }

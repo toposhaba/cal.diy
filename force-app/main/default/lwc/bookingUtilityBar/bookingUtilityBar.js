@@ -14,6 +14,8 @@ export default class BookingUtilityBar extends NavigationMixin(LightningElement)
         this.loadBookings();
     }
 
+    get isNewBookingView() { return this.activeView === 'new-booking'; }
+    get isListView() { return !this.isNewBookingView; }
     get isUpcomingView() { return this.activeView === 'upcoming'; }
     get isPendingView() { return this.activeView === 'pending'; }
     get upcomingVariant() { return this.activeView === 'upcoming' ? 'brand' : 'neutral'; }
@@ -104,12 +106,16 @@ export default class BookingUtilityBar extends NavigationMixin(LightningElement)
     }
 
     handleNewBooking() {
-        this[NavigationMixin.Navigate]({
-            type: 'standard__navItemPage',
-            attributes: {
-                apiName: 'Calendar_Booking'
-            }
-        });
+        this.error = undefined;
+        this.activeView = 'new-booking';
+    }
+
+    handleBackFromNewBooking() {
+        this.activeView = 'upcoming';
+    }
+
+    handleBookingComplete() {
+        this.loadBookings();
     }
 
     handleViewAll() {

@@ -13,11 +13,13 @@
     <label>Cal.DIY</label>
     <navType>Standard</navType>
     <tabs>Setup_Wizard</tabs>
+    <tabs>Integrations</tabs>
     <tabs>Booking_Manager</tabs>
     <tabs>Calendar_Booking</tabs>
     <tabs>Calendar_Connections</tabs>
     <tabs>Schedule_Manager</tabs>
     <tabs>routingFormBuilder</tabs>
+    <tabs>routingFormAdvanced</tabs>
     <tabs>workflowBuilder</tabs>
     <tabs>Routing_Booking</tabs>
     <tabs>Booking__c</tabs>

@@ -14,3 +14,11 @@
 .slds-button_stretch {
     width: 100%;
 }
+
+.compact-shell {
+    padding: 0.25rem;
+}
+
+.full-shell {
+    padding: 0;
+}

@@ -1,0 +1,354 @@
+<template>
+    <template lwc:if={isLoading}>
+        <div class="slds-align_absolute-center slds-p-around_xx-large">
+            <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+        </div>
+    </template>
+
+    <template lwc:if={error}>
+        <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
+            <span class="slds-assistive-text">error</span>
+            <h2>{error}</h2>
+        </div>
+    </template>
+
+    <template lwc:if={isLanding}>
+        <div class="wizard-container slds-card slds-p-around_large">
+            <div class="slds-m-bottom_large">
+                <h1 class="slds-text-heading_large slds-m-bottom_x-small">Routing Forms</h1>
+                <p class="slds-text-body_regular slds-text-color_weak">
+                    Routing forms ask bookers a few questions, then send them to the right event type based on their answers.
+                </p>
+            </div>
+
+            <div class="slds-box slds-theme_shade slds-m-bottom_large">
+                <h2 class="slds-text-heading_small slds-m-bottom_x-small">How routing works</h2>
+                <ol class="slds-list_ordered slds-text-body_regular">
+                    <li>Bookers answer your questions on the Routing Booking page.</li>
+                    <li>Routes evaluate answers in order and pick a target event type.</li>
+                    <li>Bookers continue with the standard scheduling flow for that event type.</li>
+                </ol>
+            </div>
+
+            <div class="slds-m-bottom_medium">
+                <lightning-button label="Create Routing Form" variant="brand" onclick={handleCreateNew} icon-name="utility:add"></lightning-button>
+            </div>
+
+            <template lwc:if={hasExistingForms}>
+                <h2 class="slds-text-heading_small slds-m-bottom_small">Your routing forms</h2>
+                <template for:each={existingForms} for:item="form">
+                    <div key={form.Id} class="slds-box slds-m-bottom_small">
+                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                            <div>
+                                <h3 class="slds-text-heading_small">{form.Name}</h3>
+                                <template lwc:if={form.Description__c}>
+                                    <p class="slds-text-body_small slds-text-color_weak">{form.Description__c}</p>
+                                </template>
+                                <template lwc:if={form.Is_Active__c}>
+                                    <span class="slds-badge slds-theme_success slds-m-top_xx-small">Active</span>
+                                </template>
+                                <template lwc:else>
+                                    <span class="slds-badge slds-m-top_xx-small">Inactive</span>
+                                </template>
+                            </div>
+                            <lightning-button label="Edit" variant="neutral" data-id={form.Id} onclick={handleEditExisting}></lightning-button>
+                        </div>
+                    </div>
+                </template>
+            </template>
+
+            <template lwc:else>
+                <div class="slds-illustration slds-illustration_small slds-p-around_large slds-text-align_center">
+                    <p class="slds-text-color_weak">No routing forms yet. Create one to guide bookers to the right meeting type.</p>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <template lwc:if={isWizard}>
+        <div class="wizard-container slds-card slds-p-around_large">
+            <div class="slds-m-bottom_large">
+                <h1 class="slds-text-heading_large slds-m-bottom_x-small">Create Routing Form</h1>
+                <p class="slds-text-body_regular slds-text-color_weak">
+                    Set up questions and routes step by step. You can save as a draft by leaving the form inactive.
+                </p>
+            </div>
+
+            <lightning-progress-indicator current-step={currentStep} type="path" class="slds-m-bottom_large">
+                <template for:each={steps} for:item="step">
+                    <lightning-progress-step key={step.value} label={step.label} value={step.value}></lightning-progress-step>
+                </template>
+            </lightning-progress-indicator>
+
+            <template lwc:if={isBasicsStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Form basics</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        Name your form and choose which host's event types bookers can be routed to.
+                    </p>
+                    <lightning-input
+                        type="text"
+                        label="Form Name"
+                        value={formName}
+                        onchange={handleFormNameChange}
+                        required
+                        class="slds-m-bottom_small"
+                    ></lightning-input>
+                    <lightning-textarea
+                        label="Description"
+                        value={formDescription}
+                        onchange={handleFormDescriptionChange}
+                        placeholder="Shown to bookers when they choose a form"
+                        class="slds-m-bottom_small"
+                    ></lightning-textarea>
+                    <lightning-record-picker
+                        label="Host User"
+                        placeholder="Search users..."
+                        object-api-name="User"
+                        value={hostUserId}
+                        filter={hostUserFilter}
+                        onchange={handleHostUserChange}
+                        class="slds-m-bottom_small"
+                    ></lightning-record-picker>
+                    <lightning-input
+                        type="checkbox"
+                        label="Active (visible on Routing Booking page)"
+                        checked={isActive}
+                        onchange={handleActiveChange}
+                        class="slds-m-bottom_small"
+                    ></lightning-input>
+                    <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                        <lightning-button label="Cancel" onclick={handleBackToLanding}></lightning-button>
+                        <lightning-button label="Next" variant="brand" onclick={handleNextFromBasics}></lightning-button>
+                    </div>
+                </div>
+            </template>
+
+            <template lwc:if={isQuestionsStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Questions</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        Add the questions bookers answer before routing. Drag order with the move buttons — routes evaluate top to bottom.
+                    </p>
+
+                    <template lwc:if={hasFields}>
+                        <template for:each={displayFields} for:item="field">
+                            <div key={field.clientKey} class="slds-box slds-m-bottom_small">
+                                <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                                    <div>
+                                        <p class="slds-text-heading_small">{field.name}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak">
+                                            {field.typeLabel} · {field.requiredLabel}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <lightning-button-icon
+                                            icon-name="utility:arrowup"
+                                            alternative-text="Move up"
+                                            data-index={field.index}
+                                            onclick={handleMoveFieldUp}
+                                            disabled={field.canMoveUp}
+                                            class="slds-m-right_xx-small"
+                                        ></lightning-button-icon>
+                                        <lightning-button-icon
+                                            icon-name="utility:arrowdown"
+                                            alternative-text="Move down"
+                                            data-index={field.index}
+                                            onclick={handleMoveFieldDown}
+                                            disabled={field.canMoveDown}
+                                            class="slds-m-right_xx-small"
+                                        ></lightning-button-icon>
+                                        <lightning-button label="Edit" variant="neutral" data-key={field.clientKey} onclick={handleEditFieldClick} class="slds-m-right_xx-small"></lightning-button>
+                                        <lightning-button label="Delete" variant="destructive-text" data-key={field.clientKey} onclick={handleDeleteField}></lightning-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+                    <template lwc:else>
+                        <div class="slds-box slds-theme_shade slds-text-align_center slds-p-around_medium slds-m-bottom_medium">
+                            <p class="slds-text-color_weak">No questions yet. Add at least one question to continue.</p>
+                        </div>
+                    </template>
+
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">{fieldEditorTitle}</h3>
+                        <lightning-input
+                            type="text"
+                            label="Question Text"
+                            value={fieldDraftName}
+                            onchange={handleFieldDraftNameChange}
+                            class="slds-m-bottom_small"
+                        ></lightning-input>
+                        <lightning-combobox
+                            label="Answer Type"
+                            options={fieldTypeOptions}
+                            value={fieldDraftType}
+                            onchange={handleFieldDraftTypeChange}
+                            class="slds-m-bottom_small"
+                        ></lightning-combobox>
+                        <template lwc:if={showFieldOptions}>
+                            <lightning-textarea
+                                label="Options (one per line)"
+                                value={fieldDraftOptions}
+                                onchange={handleFieldDraftOptionsChange}
+                                class="slds-m-bottom_small"
+                            ></lightning-textarea>
+                        </template>
+                        <lightning-input
+                            type="checkbox"
+                            label="Required"
+                            checked={fieldDraftRequired}
+                            onchange={handleFieldDraftRequiredChange}
+                            class="slds-m-bottom_small"
+                        ></lightning-input>
+                        <lightning-button label="Save Question" variant="brand" onclick={handleSaveFieldDraft} class="slds-m-right_small"></lightning-button>
+                        <lightning-button label="Clear" onclick={handleCancelFieldDraft}></lightning-button>
+                    </div>
+
+                    <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                        <lightning-button label="Back" onclick={handleBackToBasics}></lightning-button>
+                        <div>
+                            <lightning-button label="Add Question" onclick={handleAddFieldClick} class="slds-m-right_small"></lightning-button>
+                            <lightning-button label="Next" variant="brand" onclick={handleNextFromQuestions}></lightning-button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <template lwc:if={isRoutesStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Routes</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        Map answers to event types. Routes are checked in order — leave the condition blank for a catch-all default route.
+                    </p>
+
+                    <template lwc:if={hasRoutes}>
+                        <template for:each={displayRoutes} for:item="route">
+                            <div key={route.index} class="slds-box slds-m-bottom_small">
+                                <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                                    <div>
+                                        <p class="slds-text-heading_small">{route.targetLabel}</p>
+                                        <p class="slds-text-body_small slds-text-color_weak">{route.conditionSummary}</p>
+                                    </div>
+                                    <div>
+                                        <lightning-button label="Edit" variant="neutral" data-index={route.index} onclick={handleEditRouteClick} class="slds-m-right_xx-small"></lightning-button>
+                                        <lightning-button label="Delete" variant="destructive-text" data-index={route.index} onclick={handleDeleteRoute}></lightning-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+                    <template lwc:else>
+                        <div class="slds-box slds-theme_shade slds-text-align_center slds-p-around_medium slds-m-bottom_medium">
+                            <p class="slds-text-color_weak">No routes yet. Add at least one route to an event type.</p>
+                        </div>
+                    </template>
+
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">{routeEditorTitle}</h3>
+                        <lightning-combobox
+                            label="Target Event Type"
+                            options={eventTypeOptions}
+                            value={routeDraftTargetEventTypeId}
+                            onchange={handleRouteTargetChange}
+                            required
+                            class="slds-m-bottom_small"
+                        ></lightning-combobox>
+                        <h4 class="slds-text-heading_small slds-m-top_small slds-m-bottom_x-small">Condition (optional)</h4>
+                        <lightning-combobox
+                            label="Question"
+                            options={conditionFieldOptions}
+                            value={routeDraftConditionFieldKey}
+                            onchange={handleRouteConditionFieldChange}
+                            placeholder="Always match (default route)"
+                            class="slds-m-bottom_small"
+                        ></lightning-combobox>
+                        <lightning-combobox
+                            label="Operator"
+                            options={operatorOptions}
+                            value={routeDraftConditionOperator}
+                            onchange={handleRouteConditionOperatorChange}
+                            class="slds-m-bottom_small"
+                        ></lightning-combobox>
+                        <lightning-input
+                            type="text"
+                            label="Answer Value"
+                            value={routeDraftConditionValue}
+                            onchange={handleRouteConditionValueChange}
+                            class="slds-m-bottom_small"
+                        ></lightning-input>
+                        <lightning-button label="Save Route" variant="brand" onclick={handleSaveRouteDraft} class="slds-m-right_small"></lightning-button>
+                        <lightning-button label="Clear" onclick={handleCancelRouteDraft}></lightning-button>
+                    </div>
+
+                    <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                        <lightning-button label="Back" onclick={handleBackToQuestions}></lightning-button>
+                        <div>
+                            <lightning-button label="Add Route" onclick={handleAddRouteClick} class="slds-m-right_small"></lightning-button>
+                            <lightning-button label="Next" variant="brand" onclick={handleNextFromRoutes}></lightning-button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <template lwc:if={isReviewStep}>
+                <div class="step-content">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_small">Review and publish</h2>
+                    <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                        Confirm your setup, then save. Inactive forms are saved as drafts and hidden from bookers.
+                    </p>
+
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">Basics</h3>
+                        <p><strong>Name:</strong> {formName}</p>
+                        <template lwc:if={formDescription}>
+                            <p><strong>Description:</strong> {formDescription}</p>
+                        </template>
+                        <p><strong>Host:</strong> {hostUserName}</p>
+                        <p><strong>Status:</strong> {activeStatusLabel}</p>
+                    </div>
+
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">Questions ({fields.length})</h3>
+                        <template for:each={reviewFields} for:item="field">
+                            <p key={field.clientKey} class="slds-m-bottom_xx-small">
+                                {field.name} ({field.typeLabel}, {field.requiredLabel})
+                            </p>
+                        </template>
+                    </div>
+
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">Routes ({routes.length})</h3>
+                        <template for:each={reviewRoutes} for:item="route">
+                            <p key={route.index} class="slds-m-bottom_xx-small">
+                                {route.targetLabel} — {route.conditionSummary}
+                            </p>
+                        </template>
+                    </div>
+
+                    <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                        <lightning-button label="Back" onclick={handleBackToRoutes}></lightning-button>
+                        <lightning-button label={publishButtonLabel} variant="brand" onclick={handlePublish}></lightning-button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <template lwc:if={isComplete}>
+        <div class="wizard-container slds-card slds-p-around_large">
+            <div class="slds-text-align_center">
+                <lightning-icon icon-name="utility:success" alternative-text="Success" size="large" class="slds-m-bottom_medium"></lightning-icon>
+                <h1 class="slds-text-heading_large slds-m-bottom_small">Routing form saved</h1>
+                <p class="slds-text-body_regular slds-m-bottom_large slds-text-color_weak">
+                    {savedFormName} is ready. Test it on the Routing Booking page or create another form.
+                </p>
+                <lightning-button label="Test Routing Booking" variant="brand" onclick={handleOpenRoutingBooking} class="slds-m-right_small"></lightning-button>
+                <lightning-button label="Advanced Builder" variant="neutral" onclick={handleOpenAdvancedBuilder} class="slds-m-right_small"></lightning-button>
+                <lightning-button label="Create Another" variant="neutral" onclick={handleCreateAnother} class="slds-m-right_small"></lightning-button>
+                <lightning-button label="Back to Forms" onclick={handleBackToLanding}></lightning-button>
+            </div>
+        </div>
+    </template>
+</template>

@@ -307,6 +307,35 @@ private class BookingServiceTest {
         }
     }
 
+    @IsTest
+    static void testGetBookingsForHostWithSearch() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventType(testUser.Id, 'Meeting', 30);
+            Datetime startDt = Datetime.now().addDays(3);
+            SchedulingTestDataFactory.createBooking(
+                eventType.Id, testUser.Id, startDt, startDt.addMinutes(30)
+            );
+
+            Test.startTest();
+            List<Booking__c> titleMatches = BookingService.getBookingsForHost(
+                testUser.Id, Date.today(), Date.today().addDays(30), 'Test Booking'
+            );
+            List<Booking__c> emailMatches = BookingService.getBookingsForHost(
+                testUser.Id, Date.today(), Date.today().addDays(30), 'booker@example.com'
+            );
+            List<Booking__c> noMatches = BookingService.getBookingsForHost(
+                testUser.Id, Date.today(), Date.today().addDays(30), 'not-found'
+            );
+            Test.stopTest();
+
+            System.assertEquals(1, titleMatches.size(), 'Should match booking title');
+            System.assertEquals(1, emailMatches.size(), 'Should match booker email');
+            System.assertEquals(0, noMatches.size(), 'Should not match unrelated search');
+        }
+    }
+
     private static Boolean isWeekend(Date d) {
         Datetime dt = Datetime.newInstance(d, Time.newInstance(12, 0, 0, 0));
         String dayName = dt.format('EEEE');
@@ -455,6 +484,17 @@ private class BookingServiceTest {
             List<Booking_Seat__c> seats = [SELECT Id FROM Booking_Seat__c WHERE Booking__c = :booking.Id];
             System.assertEquals(1, seats.size());
             System.assertEquals('Accepted', booking.Status__c);
+
+            BookingService.BookingRequest secondRequest = new BookingService.BookingRequest();
+            secondRequest.eventTypeId = eventType.Id;
+            secondRequest.startDateTime = startDt;
+            secondRequest.bookerEmail = 'student2@example.com';
+            secondRequest.bookerName = 'Student Two';
+            Booking__c secondBooking = BookingService.createBooking(secondRequest);
+
+            System.assertEquals(booking.Id, secondBooking.Id);
+            seats = [SELECT Id FROM Booking_Seat__c WHERE Booking__c = :booking.Id];
+            System.assertEquals(2, seats.size());
         }
     }
 
@@ -587,6 +627,82 @@ private class BookingServiceTest {
                 LIMIT 1
             ];
             System.assertEquals('Refunded', payment.Status__c);
+        }
+    }
+
+    @IsTest
+    static void testCreateBookingWithVideoProvider() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Schedule__c schedule = SchedulingTestDataFactory.createSchedule(testUser.Id, 'Work Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventTypeWithSchedule(
+                testUser.Id, schedule.Id, 'Virtual Meeting', 30
+            );
+            eventType.Location__c = 'Office';
+            update eventType;
+
+            Date futureDate = Date.today().addDays(14);
+            while (isWeekend(futureDate)) {
+                futureDate = futureDate.addDays(1);
+            }
+            Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(10, 0, 0, 0));
+
+            BookingService.BookingRequest request = new BookingService.BookingRequest();
+            request.eventTypeId = eventType.Id;
+            request.startDateTime = startDt;
+            request.bookerEmail = 'client@example.com';
+            request.bookerName = 'Jane Client';
+            request.videoProvider = 'Google_Meet';
+
+            Test.startTest();
+            Booking__c booking = BookingService.createBooking(request);
+            Test.stopTest();
+
+            System.assertEquals('Google_Meet', booking.Video_Provider__c);
+            System.assertEquals(null, booking.Location__c);
+        }
+    }
+
+    @IsTest
+    static void testCreateBookingWithCustomLocation() {
+        User testUser = SchedulingTestDataFactory.createTestUser();
+
+        System.runAs(testUser) {
+            Schedule__c schedule = SchedulingTestDataFactory.createSchedule(testUser.Id, 'Work Hours', true);
+            SchedulingTestDataFactory.createWorkingHours(
+                schedule.Id, 'Monday;Tuesday;Wednesday;Thursday;Friday',
+                Time.newInstance(9, 0, 0, 0), Time.newInstance(17, 0, 0, 0)
+            );
+
+            Event_Type__c eventType = SchedulingTestDataFactory.createEventTypeWithSchedule(
+                testUser.Id, schedule.Id, 'In Person Meeting', 30
+            );
+
+            Date futureDate = Date.today().addDays(14);
+            while (isWeekend(futureDate)) {
+                futureDate = futureDate.addDays(1);
+            }
+            Datetime startDt = Datetime.newInstance(futureDate, Time.newInstance(10, 0, 0, 0));
+
+            BookingService.BookingRequest request = new BookingService.BookingRequest();
+            request.eventTypeId = eventType.Id;
+            request.startDateTime = startDt;
+            request.bookerEmail = 'client@example.com';
+            request.bookerName = 'Jane Client';
+            request.location = '456 Oak Ave, Springfield';
+
+            Test.startTest();
+            Booking__c booking = BookingService.createBooking(request);
+            Test.stopTest();
+
+            System.assertEquals('456 Oak Ave, Springfield', booking.Location__c);
+            System.assertEquals(null, booking.Video_Provider__c);
         }
     }
 }

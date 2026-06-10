@@ -12,7 +12,6 @@
         </div>
     </template>
 
-    <!-- Wizard -->
     <template lwc:if={isWizard}>
         <div class="wizard-container slds-card slds-p-around_large">
             <div class="slds-m-bottom_large">
@@ -26,7 +25,6 @@
                 </template>
             </lightning-progress-indicator>
 
-            <!-- Step 1: Timezone -->
             <template lwc:if={isTimezoneStep}>
                 <div class="step-content">
                     <h2 class="slds-text-heading_medium slds-m-bottom_small">Confirm Your Timezone</h2>
@@ -46,83 +44,88 @@
                 </div>
             </template>
 
-            <!-- Step 2: Calendar Connection -->
             <template lwc:if={isCalendarStep}>
                 <div class="step-content">
                     <h2 class="slds-text-heading_medium slds-m-bottom_small">Connect a Calendar</h2>
                     <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
-                        Connect your calendar to automatically check for conflicts and push new bookings. You can skip this and do it later.
+                        Connect your calendar to check for conflicts and push bookings. Google and Microsoft are authenticated once at the org level by your admin.
                     </p>
 
-                    <template lwc:if={showOAuthInstructions}>
+                    <template lwc:if={showOrgAuthNotice}>
                         <div class="slds-box slds-theme_shade slds-m-bottom_medium">
-                            <h3 class="slds-text-heading_small slds-m-bottom_small">Authorize {calendarProvider} Calendar</h3>
-                            <p class="slds-text-body_regular slds-m-bottom_medium">
-                                To connect your calendar, you need to authorize Cal.DIY to access it via Named Credentials:
-                            </p>
-                            <ol class="slds-list_ordered slds-m-bottom_medium">
-                                <li class="slds-m-bottom_x-small">Click <strong>Open Setup</strong> below to open the Named Credentials page</li>
-                                <li class="slds-m-bottom_x-small">Find the <strong>{calendarProvider} Calendar</strong> Named Credential</li>
-                                <li class="slds-m-bottom_x-small">Under <strong>External Credential</strong>, click the credential name</li>
-                                <li class="slds-m-bottom_x-small">In the <strong>Permission Set Mappings</strong> section, find your mapping and click <strong>Authenticate</strong></li>
-                                <li class="slds-m-bottom_x-small">Complete the OAuth sign-in with your calendar account</li>
-                                <li class="slds-m-bottom_x-small">Return here and click <strong>Verify Connection</strong></li>
-                            </ol>
-                            <div class="slds-grid slds-gutters_small slds-m-bottom_medium">
-                                <div class="slds-col">
-                                    <lightning-button label="Open Setup" variant="brand" onclick={handleOpenOAuthSetup} icon-name="utility:new_window"></lightning-button>
-                                </div>
-                                <div class="slds-col">
-                                    <lightning-button label="Verify Connection" variant="success" onclick={handleVerifyOAuth} icon-name="utility:check"></lightning-button>
-                                </div>
+                            <h3 class="slds-text-heading_small slds-m-bottom_small">Admin setup required</h3>
+                            <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_medium" role="alert">
+                                <p class="slds-text-body_regular">{orgAuthMessage}</p>
                             </div>
-                            <lightning-button label="Skip for now" variant="neutral" onclick={handleSkipOAuth}></lightning-button>
+                            <lightning-button label="Open Integrations" variant="brand" onclick={handleOpenIntegrations} icon-name="utility:settings" class="slds-m-right_small"></lightning-button>
+                            <lightning-button label="Skip for now" variant="neutral" onclick={handleSkipOrgAuth}></lightning-button>
                         </div>
                     </template>
 
-                    <template lwc:if={notShowingOAuth}>
-                        <lightning-combobox
-                            label="Calendar Provider"
-                            value={calendarProvider}
-                            options={providerOptions}
-                            onchange={handleProviderChange}
-                            placeholder="Select a provider..."
-                            class="slds-m-bottom_small"
-                        ></lightning-combobox>
-                        <lightning-input
-                            type="text"
-                            label="Calendar ID (optional)"
-                            value={calendarId}
-                            onchange={handleCalendarIdChange}
-                            placeholder="Leave blank for primary calendar"
-                            class="slds-m-bottom_small"
-                        ></lightning-input>
-                        <lightning-input
-                            type="checkbox"
-                            label="Check for scheduling conflicts"
-                            checked={calendarCheckConflicts}
-                            onchange={handleCheckConflictsChange}
-                            class="slds-m-bottom_small"
-                        ></lightning-input>
-                        <lightning-input
-                            type="checkbox"
-                            label="Push new bookings to this calendar"
-                            checked={calendarPushEvents}
-                            onchange={handlePushEventsChange}
-                            class="slds-m-bottom_small"
-                        ></lightning-input>
-                        <div class="slds-m-top_large slds-grid slds-grid_align-spread">
-                            <lightning-button label="Back" onclick={handleBackToTimezone}></lightning-button>
-                            <div>
-                                <lightning-button label="Skip" onclick={handleSkipCalendar} class="slds-m-right_small"></lightning-button>
-                                <lightning-button label="Connect & Continue" variant="brand" onclick={handleConnectCalendar}></lightning-button>
-                            </div>
+                    <template lwc:if={showingAdminOAuthFlow}>
+                        <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                            <h3 class="slds-text-heading_small slds-m-bottom_small">{authenticateCalendarHeading}</h3>
+                            <template lwc:if={oauthNotConfigured}>
+                                <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_medium" role="alert">
+                                    <p class="slds-text-body_regular">{oauthSetupMessage}</p>
+                                </div>
+                                <lightning-button label="Open Auth Provider Setup" variant="brand" onclick={handleOpenOAuthSetup} icon-name="utility:settings" class="slds-m-right_small"></lightning-button>
+                            </template>
+                            <template lwc:if={notShowingOrgAuthNotice}>
+                                <p class="slds-text-body_regular slds-m-bottom_medium">
+                                    Authenticate the org-level Named Principal, then verify the connection.
+                                </p>
+                                <lightning-button label="Authenticate" variant="brand" onclick={handleAuthorizeOAuth} icon-name="utility:new_window" class="slds-m-right_x-small"></lightning-button>
+                                <lightning-button label="Verify Connection" variant="success" onclick={handleVerifyOAuth} icon-name="utility:check" class="slds-m-right_x-small"></lightning-button>
+                                <lightning-button label="Cancel" variant="neutral" onclick={handleCancelAdminAuth}></lightning-button>
+                            </template>
                         </div>
+                    </template>
+
+                    <template lwc:if={notShowingOrgAuthNotice}>
+                        <template lwc:if={notShowingAdminOAuthFlow}>
+                            <lightning-combobox
+                                label="Calendar Provider"
+                                value={calendarProvider}
+                                options={providerOptions}
+                                onchange={handleProviderChange}
+                                placeholder="Select a provider..."
+                                class="slds-m-bottom_small"
+                            ></lightning-combobox>
+                            <lightning-input
+                                type="text"
+                                label="Calendar ID (optional)"
+                                value={calendarId}
+                                onchange={handleCalendarIdChange}
+                                placeholder="Leave blank for primary calendar"
+                                class="slds-m-bottom_small"
+                            ></lightning-input>
+                            <lightning-input
+                                type="checkbox"
+                                label="Check for scheduling conflicts"
+                                checked={calendarCheckConflicts}
+                                onchange={handleCheckConflictsChange}
+                                class="slds-m-bottom_small"
+                            ></lightning-input>
+                            <lightning-input
+                                type="checkbox"
+                                label="Push new bookings to this calendar"
+                                checked={calendarPushEvents}
+                                onchange={handlePushEventsChange}
+                                class="slds-m-bottom_small"
+                            ></lightning-input>
+                            <div class="slds-m-top_large slds-grid slds-grid_align-spread">
+                                <lightning-button label="Back" onclick={handleBackToTimezone}></lightning-button>
+                                <div>
+                                    <lightning-button label="Skip" onclick={handleSkipCalendar} class="slds-m-right_small"></lightning-button>
+                                    <lightning-button label="Connect & Continue" variant="brand" onclick={handleConnectCalendar}></lightning-button>
+                                </div>
+                            </div>
+                        </template>
                     </template>
                 </div>
             </template>
 
-            <!-- Step 3: Schedule + Availability -->
             <template lwc:if={isAvailabilityStep}>
                 <div class="step-content">
                     <h2 class="slds-text-heading_medium slds-m-bottom_small">Set Your Availability</h2>
@@ -174,7 +177,6 @@
                 </div>
             </template>
 
-            <!-- Step 4: Event Type -->
             <template lwc:if={isEventTypeStep}>
                 <div class="step-content">
                     <h2 class="slds-text-heading_medium slds-m-bottom_small">Create Your First Event Type</h2>
@@ -215,7 +217,6 @@
         </div>
     </template>
 
-    <!-- Dashboard -->
     <template lwc:if={isDashboard}>
         <div class="dashboard-container">
             <lightning-card title="Cal.DIY - You're All Set!" icon-name="standard:event">
@@ -251,6 +252,38 @@
                     </div>
                 </div>
             </lightning-card>
+
+            <template lwc:if={isSchedulingAdmin}>
+                <lightning-card title="Org Calendar Integration (Admin)" icon-name="standard:connected_apps" class="slds-m-top_medium">
+                    <div class="slds-p-around_medium">
+                        <template lwc:if={showingDashboardAdminOAuthFlow}>
+                            <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                                <h3 class="slds-text-heading_small slds-m-bottom_small">{authenticateCalendarHeading}</h3>
+                                <template lwc:if={oauthNotConfigured}>
+                                    <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_medium" role="alert">
+                                        <p class="slds-text-body_regular">{oauthSetupMessage}</p>
+                                    </div>
+                                    <lightning-button label="Open Auth Provider Setup" variant="brand" onclick={handleOpenOAuthSetup} icon-name="utility:settings" class="slds-m-right_small"></lightning-button>
+                                </template>
+                                <template lwc:if={notShowingOrgAuthNotice}>
+                                    <lightning-button label="Authenticate" variant="brand" onclick={handleAuthorizeOAuth} icon-name="utility:new_window" class="slds-m-right_x-small"></lightning-button>
+                                    <lightning-button label="Verify Connection" variant="success" onclick={handleVerifyOAuth} icon-name="utility:check" class="slds-m-right_x-small"></lightning-button>
+                                    <lightning-button label="Cancel" variant="neutral" onclick={handleCancelAdminAuth}></lightning-button>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template lwc:if={showingDashboardAdminAuth}>
+                            <p class="slds-text-body_regular slds-m-bottom_medium slds-text-color_weak">
+                                Google and Microsoft calendar APIs use org-level Named Principals. Authenticate each service once here or in Integrations.
+                            </p>
+                            <lightning-button label="Authenticate Google Calendar" variant="brand" onclick={handleAuthenticateGoogleAdmin} icon-name="utility:connected_apps" class="slds-m-right_x-small slds-m-bottom_x-small"></lightning-button>
+                            <lightning-button label="Authenticate Microsoft Outlook" variant="brand" onclick={handleAuthenticateMicrosoftAdmin} icon-name="utility:connected_apps" class="slds-m-right_x-small slds-m-bottom_x-small"></lightning-button>
+                            <lightning-button label="Open Integrations" variant="neutral" onclick={handleOpenIntegrations} class="slds-m-bottom_x-small"></lightning-button>
+                        </template>
+                    </div>
+                </lightning-card>
+            </template>
         </div>
     </template>
 </template>

@@ -34,6 +34,34 @@ public class SchedulingTestDataFactory {
         return u;
     }
 
+    public static User createBookerUser() {
+        Profile p = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1];
+        String uniqueStr = String.valueOf(Datetime.now().getTime());
+        User u = new User(
+            FirstName = 'Test',
+            LastName = 'Booker',
+            Email = 'testbooker' + uniqueStr + '@example.com',
+            Username = 'testbooker' + uniqueStr + '@example.com.test',
+            Alias = 'tbkr',
+            TimeZoneSidKey = 'America/New_York',
+            LocaleSidKey = 'en_US',
+            EmailEncodingKey = 'UTF-8',
+            ProfileId = p.Id,
+            LanguageLocaleKey = 'en_US'
+        );
+        insert u;
+
+        PermissionSet bookerPermSet = [
+            SELECT Id FROM PermissionSet WHERE Name = 'Scheduling_Booker' LIMIT 1
+        ];
+        insert new PermissionSetAssignment(
+            AssigneeId = u.Id,
+            PermissionSetId = bookerPermSet.Id
+        );
+
+        return u;
+    }
+
     public static Schedule__c createSchedule(Id userId, String name, Boolean isDefault) {
         Schedule__c schedule = new Schedule__c(
             Name = name,

@@ -5,7 +5,7 @@ public with sharing class SchedulingController {
         Id targetUser = hostUserId != null ? hostUserId : UserInfo.getUserId();
         return [
             SELECT Id, Name, Slug__c, Duration_Minutes__c, Multiple_Durations__c, Description__c,
-                   Location__c, Is_Active__c, Owner_User__c, Price__c,
+                   Location__c, Video_Provider__c, Is_Active__c, Owner_User__c, Price__c,
                    Success_Redirect_URL__c
             FROM Event_Type__c
             WHERE (Owner_User__c = :targetUser OR (Owner_User__c = null AND OwnerId = :targetUser))
@@ -98,10 +98,18 @@ public with sharing class SchedulingController {
         }
     }
 
+    @AuraEnabled(cacheable=true)
+    public static MeetingOptionsService.BookingLocationSettings getBookingLocationSettings(
+        Id hostUserId, Id eventTypeId
+    ) {
+        return MeetingOptionsService.getBookingLocationSettings(hostUserId, eventTypeId);
+    }
+
     @AuraEnabled
     public static Booking__c createBookingWithCustomFields(
         Id eventTypeId, String startDateTimeStr, String bookerEmail, String bookerName,
-        String bookerPhone, Map<String, String> customFieldResponses
+        String bookerPhone, Map<String, String> customFieldResponses,
+        String location, String videoProvider
     ) {
         Map<Id, String> responses = new Map<Id, String>();
         if (customFieldResponses != null) {
@@ -119,6 +127,8 @@ public with sharing class SchedulingController {
             request.bookerEmail = bookerEmail;
             request.bookerName = bookerName;
             request.attendeeEmails = new List<String>();
+            request.location = location;
+            request.videoProvider = videoProvider;
 
             Booking__c booking = BookingService.createBooking(request);
             if (String.isNotBlank(bookerPhone)) {
@@ -137,7 +147,8 @@ public with sharing class SchedulingController {
     @AuraEnabled
     public static Booking__c createBooking(
         Id eventTypeId, String startDateTimeStr,
-        String bookerEmail, String bookerName, List<String> attendeeEmails
+        String bookerEmail, String bookerName, List<String> attendeeEmails,
+        String location, String videoProvider
     ) {
         BookingService.BookingRequest request = new BookingService.BookingRequest();
         request.eventTypeId = eventTypeId;
@@ -145,6 +156,8 @@ public with sharing class SchedulingController {
         request.bookerEmail = bookerEmail;
         request.bookerName = bookerName;
         request.attendeeEmails = attendeeEmails;
+        request.location = location;
+        request.videoProvider = videoProvider;
 
         try {
             return BookingService.createBooking(request);
@@ -190,10 +203,10 @@ public with sharing class SchedulingController {
     }
 
     @AuraEnabled(cacheable=true)
-    public static List<Booking__c> getMyBookings(String startDateStr, String endDateStr) {
+    public static List<Booking__c> getMyBookings(String startDateStr, String endDateStr, String searchTerm) {
         Date startDate = Date.valueOf(startDateStr);
         Date endDate = Date.valueOf(endDateStr);
-        return BookingService.getBookingsForHost(UserInfo.getUserId(), startDate, endDate);
+        return BookingService.getBookingsForHost(UserInfo.getUserId(), startDate, endDate, searchTerm);
     }
 
     @AuraEnabled(cacheable=true)
@@ -406,7 +419,8 @@ public with sharing class SchedulingController {
 
     @AuraEnabled
     public static Booking__c createBookingWithFields(
-        Id eventTypeId, String startDateTimeStr, Map<String, Object> fieldValues
+        Id eventTypeId, String startDateTimeStr, Map<String, Object> fieldValues,
+        String location, String videoProvider
     ) {
         BookingService.BookingRequest request = new BookingService.BookingRequest();
         request.eventTypeId = eventTypeId;
@@ -414,6 +428,10 @@ public with sharing class SchedulingController {
         request.bookerEmail = (String) fieldValues.get('Booker_Email__c');
         request.bookerName = (String) fieldValues.get('Booker_Name__c');
         request.attendeeEmails = new List<String>();
+        request.location = String.isNotBlank(location)
+            ? location
+            : (String) fieldValues.get('Location__c');
+        request.videoProvider = videoProvider;
 
         try {
             Booking__c booking = BookingService.createBooking(request);
@@ -421,10 +439,6 @@ public with sharing class SchedulingController {
             Boolean needsUpdate = false;
             if (fieldValues.containsKey('Booker_Contact__c') && fieldValues.get('Booker_Contact__c') != null) {
                 booking.Booker_Contact__c = (Id) fieldValues.get('Booker_Contact__c');
-                needsUpdate = true;
-            }
-            if (fieldValues.containsKey('Location__c') && fieldValues.get('Location__c') != null) {
-                booking.Location__c = (String) fieldValues.get('Location__c');
                 needsUpdate = true;
             }
 
